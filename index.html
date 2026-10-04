@@ -117,6 +117,9 @@
                 <div class="card-header">
                   <span class="card-chapter-tag" id="card-chapter-badge">Chương 1 • Câu 1.1</span>
                   <div class="card-top-tools">
+                    <button class="card-tool-btn" id="btn-card-font" title="Đổi cỡ chữ (Phím F: Vừa / Lớn / Rất lớn)" aria-label="Đổi cỡ chữ">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h6M7 5v14M14 19h6M17 10v9M5 5h4M15 10h4"/></svg>
+                    </button>
                     <button class="card-tool-btn" id="btn-card-tts" title="Đọc câu hỏi (Giọng tiếng Việt)" aria-label="Đọc câu hỏi">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                     </button>
@@ -127,7 +130,7 @@
                 </div>
 
                 <div class="card-body">
-                  <div class="question-header-tag" id="card-q-header">Câu 1.1</div>
+                  <div class="question-header-tag hide" id="card-q-header">Câu 1.1</div>
                   <div class="question-text" id="card-question-text">Đang tải câu hỏi...</div>
                   
                   <!-- Subtle choices hint if it's multiple choice -->
@@ -153,6 +156,9 @@
                     ĐÁP ÁN CHÍNH XÁC
                   </span>
                   <div class="card-top-tools">
+                    <button class="card-tool-btn" id="btn-card-back-font" title="Đổi cỡ chữ (Phím F: Vừa / Lớn / Rất lớn)" aria-label="Đổi cỡ chữ">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h6M7 5v14M14 19h6M17 10v9M5 5h4M15 10h4"/></svg>
+                    </button>
                     <button class="card-tool-btn" id="btn-card-back-tts" title="Đọc đáp án" aria-label="Đọc đáp án">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                     </button>
@@ -225,6 +231,25 @@
       <!-- MODE 2: QUIZ / TRẮC NGHIỆM VIEW -->
       <section class="view-panel" id="view-quiz" aria-label="Khu vực Trắc Nghiệm">
         <div class="quiz-container">
+          <!-- Quiz Toolbar: Count selection & restart -->
+          <div class="quiz-toolbar">
+            <div class="quiz-size-selector">
+              <span class="quiz-toolbar-label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>Số lượng câu:</span>
+              </span>
+              <div class="quiz-size-pills" id="quiz-size-pills">
+                <button class="quiz-size-pill active" data-count="20" type="button">20 câu</button>
+                <button class="quiz-size-pill" data-count="40" type="button">40 câu</button>
+                <button class="quiz-size-pill" data-count="60" type="button">60 câu</button>
+              </div>
+            </div>
+            <button class="btn-ghost quiz-restart-btn" id="btn-quiz-restart" title="Tạo bộ đề ngẫu nhiên mới" aria-label="Đề mới">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              <span>Đề mới</span>
+            </button>
+          </div>
+
           <!-- Quiz Top Stats -->
           <div class="quiz-header-bar">
             <div class="quiz-stat-pill">
@@ -237,8 +262,8 @@
               <span class="quiz-stat-val" id="quiz-streak-val">0</span>
             </div>
             <div class="quiz-stat-pill">
-              <span class="quiz-stat-label">Câu:</span>
-              <span class="quiz-stat-val" id="quiz-current-num">1 / 10</span>
+              <span class="quiz-stat-label">Tiến độ:</span>
+              <span class="quiz-stat-val" id="quiz-current-num">1 / 20</span>
             </div>
           </div>
 
@@ -307,6 +332,7 @@
         <div class="shortcut-row"><kbd>→</kbd> / <kbd>←</kbd><span>Chuyển sang câu Sau / Trước</span></div>
         <div class="shortcut-row"><kbd>1</kbd><span>Đánh dấu "Chưa thuộc" (Cần ôn lại)</span></div>
         <div class="shortcut-row"><kbd>3</kbd><span>Đánh dấu "Đã thuộc"</span></div>
+        <div class="shortcut-row"><kbd>F</kbd><span>Đổi cỡ chữ thẻ (Vừa / Lớn / Rất lớn)</span></div>
         <div class="shortcut-row"><kbd>S</kbd><span>Bật/Tắt Lưu thẻ (Đánh dấu sao ⭐)</span></div>
         <div class="shortcut-row"><kbd>R</kbd><span>Xáo trộn ngẫu nhiên (Shuffle)</span></div>
         <div class="shortcut-row"><kbd>A</kbd><span>Bật/Tắt tự động chạy (Autoplay)</span></div>

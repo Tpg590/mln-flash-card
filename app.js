@@ -20,6 +20,7 @@
     autoplayInterval: null,
     soundEnabled: localStorage.getItem('mln_sound') !== 'false',
     theme: localStorage.getItem('mln_theme') || 'dark',
+    cardFontSize: localStorage.getItem('mln_card_font_size') || 'normal', // 'normal' | 'large' | 'xlarge'
 
     // Persistent user progress
     starred: new Set(JSON.parse(localStorage.getItem('mln_starred') || '[]')),
@@ -31,7 +32,8 @@
       currentIndex: 0,
       score: 0,
       streak: 0,
-      answered: false
+      answered: false,
+      selectedCount: parseInt(localStorage.getItem('mln_quiz_count') || '20', 10)
     }
   };
 
@@ -86,6 +88,8 @@
     // Flashcard
     cardScene: document.getElementById('card-scene'),
     flashcard: document.getElementById('flashcard'),
+    cardFront: document.querySelector('.card-front'),
+    cardBack: document.querySelector('.card-back'),
     cardChapterBadge: document.getElementById('card-chapter-badge'),
     cardQHeader: document.getElementById('card-q-header'),
     cardQuestionText: document.getElementById('card-question-text'),
@@ -94,6 +98,8 @@
     cardAnswerText: document.getElementById('card-answer-text'),
     cardAnswerBreakdown: document.getElementById('card-answer-breakdown'),
     cardBreakdownList: document.getElementById('card-breakdown-list'),
+    btnCardFont: document.getElementById('btn-card-font'),
+    btnCardBackFont: document.getElementById('btn-card-back-font'),
     btnCardTts: document.getElementById('btn-card-tts'),
     btnCardBackTts: document.getElementById('btn-card-back-tts'),
     btnCardStar: document.getElementById('btn-card-star'),
@@ -112,6 +118,8 @@
     autoplayText: document.getElementById('autoplay-text'),
 
     // Quiz elements
+    quizSizePills: document.getElementById('quiz-size-pills'),
+    btnQuizRestart: document.getElementById('btn-quiz-restart'),
     quizScoreVal: document.getElementById('quiz-score-val'),
     quizStreakVal: document.getElementById('quiz-streak-val'),
     quizCurrentNum: document.getElementById('quiz-current-num'),
@@ -417,6 +425,50 @@
     }
 
     updateProgressIndicator();
+    requestAnimationFrame(adjustCardHeight);
+  }
+
+  function initCardFontSize() {
+    els.flashcard.setAttribute('data-card-font', state.cardFontSize);
+  }
+
+  function cycleCardFontSize() {
+    const modes = ['normal', 'large', 'xlarge'];
+    const nextIdx = (modes.indexOf(state.cardFontSize) + 1) % modes.length;
+    state.cardFontSize = modes[nextIdx];
+    localStorage.setItem('mln_card_font_size', state.cardFontSize);
+    initCardFontSize();
+    setTimeout(adjustCardHeight, 50);
+    playClickSound();
+
+    const labels = {
+      normal: 'Vừa (Mặc định)',
+      large: 'Lớn (115%)',
+      xlarge: 'Rất lớn (130%)'
+    };
+    showToast(`Cỡ chữ thẻ: ${labels[state.cardFontSize]}`);
+  }
+
+  function adjustCardHeight() {
+    if (!els.cardFront || !els.cardBack) return;
+    const baseMin = window.innerWidth <= 768 ? 460 : 480;
+
+    // Measure front content
+    const frontHeader = els.cardFront.querySelector('.card-header');
+    const frontBody = els.cardFront.querySelector('.card-body');
+    const frontFooter = els.cardFront.querySelector('.card-footer');
+
+    // Measure back content
+    const backHeader = els.cardBack.querySelector('.card-header');
+    const backBody = els.cardBack.querySelector('.card-body');
+    const backFooter = els.cardBack.querySelector('.card-footer');
+
+    const frontNeeded = (frontHeader?.offsetHeight || 0) + (frontBody?.scrollHeight || 0) + (frontFooter?.offsetHeight || 0) + 70;
+    const backNeeded = (backHeader?.offsetHeight || 0) + (backBody?.scrollHeight || 0) + (backFooter?.offsetHeight || 0) + 70;
+
+    const targetH = Math.max(baseMin, frontNeeded, backNeeded);
+    els.cardScene.style.minHeight = `${targetH}px`;
+    els.flashcard.style.minHeight = `${targetH}px`;
   }
 
   function flipCard() {
@@ -522,10 +574,25 @@
   }
 
   // 9. QUIZ MODE
-  function initQuiz() {
+  function initQuiz(customCount) {
+    const count = customCount || state.quiz.selectedCount || 20;
+    state.quiz.selectedCount = count;
+    localStorage.setItem('mln_quiz_count', count);
+
+    // Update active pill UI
+    if (els.quizSizePills) {
+      const pills = els.quizSizePills.querySelectorAll('.quiz-size-pill');
+      pills.forEach(p => {
+        p.classList.toggle('active', parseInt(p.getAttribute('data-count'), 10) === count);
+      });
+    }
+
     let pool = [...state.filteredQuestions];
-    if (pool.length < 4) pool = [...state.allQuestions];
-    state.quiz.questions = shuffleArray([...pool]).slice(0, 20); // 20 questions session
+    if (pool.length < count) {
+      // If current filter has fewer questions than requested count, pull from all questions
+      pool = [...state.allQuestions];
+    }
+    state.quiz.questions = shuffleArray([...pool]).slice(0, count);
     state.quiz.currentIndex = 0;
     state.quiz.score = 0;
     state.quiz.streak = 0;
@@ -850,6 +917,20 @@
       toggleStarCurrent();
     });
 
+    // Font size toggle buttons
+    if (els.btnCardFont) {
+      els.btnCardFont.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cycleCardFontSize();
+      });
+    }
+    if (els.btnCardBackFont) {
+      els.btnCardBackFont.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cycleCardFontSize();
+      });
+    }
+
     // Text to speech
     els.btnCardTts.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -864,6 +945,36 @@
         speakVietnamese(state.filteredQuestions[state.currentIndex].answer);
       }
     });
+
+    // Window resize - recompute card height if needed
+    window.addEventListener('resize', () => {
+      if (state.currentMode === 'flashcard') {
+        adjustCardHeight();
+      }
+    });
+
+    // Quiz question count pills
+    if (els.quizSizePills) {
+      const pills = els.quizSizePills.querySelectorAll('.quiz-size-pill');
+      pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          const count = parseInt(pill.getAttribute('data-count'), 10);
+          if (count === state.quiz.selectedCount && state.quiz.questions.length === count) return;
+          initQuiz(count);
+          playClickSound();
+          showToast(`Đã bắt đầu bài trắc nghiệm ${count} câu 📝`);
+        });
+      });
+    }
+
+    // Quiz restart button
+    if (els.btnQuizRestart) {
+      els.btnQuizRestart.addEventListener('click', () => {
+        initQuiz(state.quiz.selectedCount);
+        playClickSound();
+        showToast(`Đã tạo bộ đề mới (${state.quiz.selectedCount} câu) 🔀`);
+      });
+    }
 
     // Quiz next
     els.btnQuizNext.addEventListener('click', nextQuizQuestion);
@@ -900,13 +1011,16 @@
         } else if (e.key === '3') {
           e.preventDefault();
           rateCurrentCard('mastered');
-        } else if (e.key.toLowerCase() === 's') {
+        } else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           toggleStarCurrent();
-        } else if (e.key.toLowerCase() === 'r') {
+        } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          cycleCardFontSize();
+        } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           els.btnShuffle.click();
-        } else if (e.key.toLowerCase() === 'a') {
+        } else if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           toggleAutoplay();
         }
@@ -918,13 +1032,65 @@
     });
   }
 
-  // 14. INITIALIZE
+  // 14. SECURITY / ANTI-INSPECT PROTECTION
+  function setupSecurityProtection() {
+    // 1. Disable Right-Click Context Menu
+    document.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showToast('⚠️ Chuột phải đã bị khóa để bảo mật đề thi.');
+      return false;
+    }, true);
+
+    // 2. Disable Content Dragging
+    document.addEventListener('dragstart', (e) => {
+      e.preventDefault();
+      return false;
+    }, true);
+
+    // 3. Disable DevTools & View Source Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
+      // F12 key
+      const isF12 = e.key === 'F12' || e.keyCode === 123;
+
+      // Ctrl + Shift + I/J/C or Cmd + Option + I/J/C (Developer Tools)
+      const isDevToolsCombo = (e.ctrlKey || (isMac && e.metaKey)) && 
+                              (e.shiftKey || (isMac && e.altKey)) && 
+                              ['i', 'j', 'c'].includes(e.key.toLowerCase());
+
+      // Ctrl + U or Cmd + Option + U (View Source)
+      const isViewSource = (e.ctrlKey || (isMac && (e.metaKey && e.altKey))) && 
+                           e.key.toLowerCase() === 'u';
+
+      // Ctrl + S (Save Page)
+      const isSavePage = (e.ctrlKey || (isMac && e.metaKey)) && 
+                         e.key.toLowerCase() === 's';
+
+      if (isF12 || isDevToolsCombo || isViewSource) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast('⚠️ Tính năng kiểm tra (DevTools / View Source) đã bị khóa.');
+        return false;
+      }
+
+      if (isSavePage) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    }, true);
+  }
+
+  // 15. INITIALIZE
   function init() {
     initTheme();
     initSound();
+    initCardFontSize();
     updateCounts();
     applyFilterAndSearch();
     setupEventListeners();
+    setupSecurityProtection();
   }
 
   // Run on DOM ready
