@@ -4,6 +4,11 @@
  * Tổng số câu hỏi: 404
  */
 
+// Bảo vệ truy cập trực tiếp: Nếu truy cập trực tiếp file qua thanh địa chỉ trình duyệt, chuyển hướng về trang chủ '/'
+if (typeof window !== 'undefined' && window.location && window.location.pathname && window.location.pathname.endsWith('.js')) {
+  window.location.replace('/');
+}
+
 const FLASHCARD_DATA = [
   {
     "id": 1,

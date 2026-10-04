@@ -2,6 +2,54 @@
   "version": 2,
   "name": "mln-flash-card",
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/(data\\.js|app\\.js|style\\.css)",
+      "has": [
+        {
+          "type": "header",
+          "key": "Sec-Fetch-Dest",
+          "value": "document"
+        }
+      ],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/(data\\.js|app\\.js|style\\.css)",
+      "has": [
+        {
+          "type": "header",
+          "key": "Sec-Fetch-Mode",
+          "value": "navigate"
+        }
+      ],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/(data\\.js|app\\.js|style\\.css)",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": "(.*text/html.*)"
+        }
+      ],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/(.*\\.(docx|py|md|json|txt|doc|git.*))",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/:path((?!$|data\\.js$|app\\.js$|style\\.css$).+)",
+      "destination": "/",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

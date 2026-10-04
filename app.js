@@ -4,7 +4,15 @@
  */
 
 (() => {
-  'use strict';
+  // URL validation & History guard: Luôn chuẩn hóa URL về trang chủ '/', không cho phép trỏ sang file/đường dẫn khác trong dự án
+  if (window.location.pathname !== '/' && window.location.pathname !== '') {
+    window.history.replaceState(null, '', '/');
+  }
+  window.addEventListener('popstate', () => {
+    if (window.location.pathname !== '/' && window.location.pathname !== '') {
+      window.history.replaceState(null, '', '/');
+    }
+  });
 
   // 1. STATE
   const state = {
