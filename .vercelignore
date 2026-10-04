@@ -1,0 +1,5 @@
+# Exclude raw data and build scripts from deployment
+data.js
+export_data.py
+[MLN111] ĐỀ CƯƠNG ÔN TẬP.docx
+README.md

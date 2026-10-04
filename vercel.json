@@ -4,7 +4,17 @@
   "cleanUrls": true,
   "redirects": [
     {
-      "source": "/(data.js|app.js|style.css)",
+      "source": "/data.js",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/data",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/app.js",
       "has": [
         {
           "type": "header",
@@ -16,31 +26,19 @@
       "permanent": false
     },
     {
-      "source": "/(data.js|app.js|style.css)",
+      "source": "/style.css",
       "has": [
         {
           "type": "header",
-          "key": "Sec-Fetch-Mode",
-          "value": "navigate"
+          "key": "Sec-Fetch-Dest",
+          "value": "document"
         }
       ],
       "destination": "/",
       "permanent": false
     },
     {
-      "source": "/(data.js|app.js|style.css)",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*text/html.*"
-        }
-      ],
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/((?!data.js$|app.js$|style.css$).+)",
+      "source": "/((?!style.css$|app.js$).+)",
       "destination": "/",
       "permanent": false
     }
@@ -64,7 +62,16 @@
       ]
     },
     {
-      "source": "/(data.js|style.css|app.js)",
+      "source": "/(data.js|data)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/(style.css|app.js)",
       "headers": [
         {
           "key": "Cache-Control",
