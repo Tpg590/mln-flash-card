@@ -4,7 +4,7 @@
   "cleanUrls": true,
   "redirects": [
     {
-      "source": "/(data\\.js|app\\.js|style\\.css)",
+      "source": "/(data.js|app.js|style.css)",
       "has": [
         {
           "type": "header",
@@ -16,7 +16,7 @@
       "permanent": false
     },
     {
-      "source": "/(data\\.js|app\\.js|style\\.css)",
+      "source": "/(data.js|app.js|style.css)",
       "has": [
         {
           "type": "header",
@@ -28,24 +28,19 @@
       "permanent": false
     },
     {
-      "source": "/(data\\.js|app\\.js|style\\.css)",
+      "source": "/(data.js|app.js|style.css)",
       "has": [
         {
           "type": "header",
           "key": "accept",
-          "value": "(.*text/html.*)"
+          "value": ".*text/html.*"
         }
       ],
       "destination": "/",
       "permanent": false
     },
     {
-      "source": "/(.*\\.(docx|py|md|json|txt|doc|git.*))",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/:path((?!$|data\\.js$|app\\.js$|style\\.css$).+)",
+      "source": "/((?!data.js$|app.js$|style.css$).+)",
       "destination": "/",
       "permanent": false
     }
