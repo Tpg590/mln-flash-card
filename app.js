@@ -6919,7 +6919,7 @@
         } else {
           btn.innerHTML = `<span class="tile-num">${tile.num}</span>`;
           // Check turn permission
-          if (!canActivePlayerPick()) {
+          if (!canActivePlayerPickTile()) {
             btn.classList.add('not-my-turn');
           }
           btn.addEventListener('click', () => onTileClick(idx));
@@ -6931,8 +6931,7 @@
       pvpEls.openedCount.textContent = openedCount;
     }
 
-    function canActivePlayerPick() {
-      if (pvpState.isAnswering) return false;
+    function isMyTurnToPlay() {
       if (pvpState.mode === 'local') return true;
       if (pvpState.mode === 'bot') return pvpState.currentTurn === 'p1';
       if (pvpState.mode === 'online') {
@@ -6943,8 +6942,17 @@
       return false;
     }
 
+    function canActivePlayerPickTile() {
+      if (pvpState.isAnswering) return false;
+      return isMyTurnToPlay();
+    }
+
+    function canActivePlayerAnswer() {
+      return isMyTurnToPlay();
+    }
+
     function onTileClick(tileIdx) {
-      if (!canActivePlayerPick()) {
+      if (!canActivePlayerPickTile()) {
         showToast('⏳ Chưa tới lượt của bạn!');
         return;
       }
@@ -6990,7 +6998,7 @@
       pvpEls.hudP2.classList.toggle('active-turn', !isP1);
 
       const activePlayer = isP1 ? pvpState.p1 : pvpState.p2;
-      const isMyTurn = canActivePlayerPick();
+      const isMyTurn = isMyTurnToPlay();
 
       if (isMyTurn) {
         pvpEls.turnBanner.className = 'pvp-turn-banner my-turn';
@@ -7062,13 +7070,17 @@
 
       const isP1 = pvpState.currentTurn === 'p1';
       const activePlayer = isP1 ? pvpState.p1 : pvpState.p2;
-      const isMyTurn = canActivePlayerPick();
+      const isMyTurn = canActivePlayerAnswer();
 
       pvpEls.battleBadge.textContent = `Ô SỐ #${tileIdx + 1} • ${q.chapter.split(':')[0] || 'MLN111'}`;
       pvpEls.battlePickerAvatar.textContent = activePlayer.avatar;
-      pvpEls.battlePickerMsg.textContent = isMyTurn 
-        ? `Lượt của bạn! Hãy chọn đáp án chính xác:` 
-        : `${activePlayer.name} đang suy nghĩ và chọn đáp án...`;
+      if (pvpState.mode === 'local') {
+        pvpEls.battlePickerMsg.textContent = `Lượt của ${activePlayer.name}! Hãy chọn đáp án chính xác:`;
+      } else {
+        pvpEls.battlePickerMsg.textContent = isMyTurn 
+          ? `Lượt của bạn! Hãy chọn đáp án chính xác:` 
+          : `${activePlayer.name} đang suy nghĩ và chọn đáp án...`;
+      }
 
       pvpEls.battleQText.textContent = q.question;
       pvpEls.battleResultBanner.classList.add('hide');
