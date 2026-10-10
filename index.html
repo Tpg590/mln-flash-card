@@ -15,9 +15,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3.0">
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📕</text></svg>">
+
+  <!-- PeerJS for WebRTC Realtime 2-Player PvP -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- Canvas Confetti for Victory Celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <script>
     // Validation: Mặc định chuẩn hóa về URL gốc '/', không cho phép trỏ sang file/đường dẫn khác trong dự án
@@ -73,6 +78,14 @@
             <line x1="3" y1="18" x2="3.01" y2="18" />
           </svg>
           <span>Tra Cứu</span>
+        </button>
+        <button class="mode-tab mode-tab-game" id="tab-games" role="tab" aria-selected="false" data-mode="games">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="2" />
+            <path d="M6 12h4m-2-2v4m9-3h.01m3 2h.01" />
+          </svg>
+          <span>Đấu Trường Game</span>
+          <span class="badge-tab-new">HOT</span>
         </button>
       </nav>
 
@@ -433,6 +446,532 @@
         </div>
       </section>
 
+      <!-- MODE 4: GAMES / ĐẤU TRƯỜNG TRÒ CHƠI VIEW -->
+      <section class="view-panel" id="view-games" aria-label="Khu vực Đấu Trường Trò Chơi">
+        <!-- Game Hub (Menu chọn trò chơi) -->
+        <div class="games-hub" id="games-hub">
+          <div class="games-hub-header">
+            <div class="games-hub-badge">🎮 ĐẤU TRƯỜNG TRIẾT HỌC</div>
+            <h2 class="games-hub-title">Học Chủ Động Qua Game Đấu Trí</h2>
+            <p class="games-hub-subtitle">Biến 404 câu hỏi triết học thành các trận so tài kịch tính, PK đối kháng cùng bạn bè hoặc vượt ải leo tháp!</p>
+          </div>
+
+          <div class="games-grid">
+            <!-- Game 1: PvP 60 Câu Đề Thi -->
+            <div class="game-card pvp-featured" id="card-launch-pvp">
+              <div class="game-card-badge-hot">🔥 ĐỐI KHÁNG PVP</div>
+              <div class="game-card-icon">⚔️</div>
+              <h3 class="game-card-title">Đấu Trường 60 Câu (PvP PK)</h3>
+              <p class="game-card-desc">Bàn cờ 60 ô số ngẫu nhiên 1 đề thi. Chơi theo lượt, chọn ô và đối đầu 4 đáp án. Mỗi người có 3 mạng (❤️❤️❤️), chọn sai -1 mạng, hết mạng là K.O.! Cả 2 cùng xem đề.</p>
+              <div class="game-card-tags">
+                <span class="game-tag">2 Người Chơi</span>
+                <span class="game-tag">Đấu Online (Mã phòng)</span>
+                <span class="game-tag">1 Máy / Bot AI</span>
+              </div>
+              <button class="btn-game-launch" id="btn-open-pvp">
+                <span>Vào Đấu Trường PvP</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+
+            <!-- Game 2: Leo Tháp Triết Gia (Boss Battle) -->
+            <div class="game-card" id="card-launch-boss">
+              <div class="game-card-badge">RPG VƯỢT ẢI</div>
+              <div class="game-card-icon">🏰</div>
+              <h3 class="game-card-title">Leo Tháp Triết Gia (Boss Battle)</h3>
+              <p class="game-card-desc">Nhập vai dũng sĩ vượt tháp khiêu chiến 3 Đại Boss Triết Học: Thần Học Trung Cổ, Duy Tâm, Ngụy Biện. Đúng gây sát thương chém Boss, sai mất 1 HP!</p>
+              <div class="game-card-tags">
+                <span class="game-tag">Đơn đấu Boss</span>
+                <span class="game-tag">Combo Chí Mạng</span>
+                <span class="game-tag">3 Cấp Độ</span>
+              </div>
+              <button class="btn-game-launch" id="btn-open-boss">
+                <span>Khiêu Chiến Boss</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+
+            <!-- Game 3: Đua Tốc Độ 60s (Speed Run Blitz) -->
+            <div class="game-card" id="card-launch-speed">
+              <div class="game-card-badge">PHẢN XẠ NHANH</div>
+              <div class="game-card-icon">⚡</div>
+              <h3 class="game-card-title">Đua Tốc Độ 60s (Speed Blitz)</h3>
+              <p class="game-card-desc">Bắt đầu 60 giây đếm ngược. Đúng +5s, sai -3s. Kích hoạt trạng thái Bốc Hỏa Fever khi đạt combo đúng liên tục, ghi điểm kỷ lục để rèn phản xạ tiềm thức!</p>
+              <div class="game-card-tags">
+                <span class="game-tag">Áp Lực 60 Giây</span>
+                <span class="game-tag">Fever x3 Điểm</span>
+                <span class="game-tag">Bảng Kỷ Lục</span>
+              </div>
+              <button class="btn-game-launch" id="btn-open-speed">
+                <span>Chơi Đua Tốc Độ</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+
+            <!-- Game 4: Lật Thẻ Ghép Cặp (Memory Match) -->
+            <div class="game-card" id="card-launch-memory">
+              <div class="game-card-badge">TRÍ NHỚ LOGIC</div>
+              <div class="game-card-icon">🧩</div>
+              <h3 class="game-card-title">Lật Thẻ Ghép Cặp (Memory Match)</h3>
+              <p class="game-card-desc">Bàn 16 ô bài úp. Lật ghép các cặp tương ứng giữa [Tác Giả / Khái Niệm] và [Định Nghĩa / Luận Điểm]. Rèn luyện khả năng liên kết bản chất triết học!</p>
+              <div class="game-card-tags">
+                <span class="game-tag">16 Thẻ Bài Úp</span>
+                <span class="game-tag">Tính Số Lượt Lật</span>
+                <span class="game-tag">Ghi Nhớ Bản Chất</span>
+              </div>
+              <button class="btn-game-launch" id="btn-open-memory">
+                <span>Chơi Ghép Cặp</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- GAME 1: PVP 60 CÂU CONTAINER -->
+        <!-- ============================================================ -->
+        <div class="game-screen hide" id="game-pvp-screen">
+          <div class="game-screen-topbar">
+            <button class="btn-back-hub" id="btn-pvp-back-hub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              <span>Về Sảnh Game</span>
+            </button>
+            <div class="game-screen-title-tag">⚔️ ĐẤU TRƯỜNG 60 CÂU PVP</div>
+            <div class="pvp-conn-status" id="pvp-conn-badge">
+              <span class="dot-status"></span>
+              <span id="pvp-conn-text">Chưa kết nối</span>
+            </div>
+          </div>
+
+          <!-- PvP Subview A: Sảnh Chờ Lobby -->
+          <div class="pvp-lobby" id="pvp-lobby">
+            <div class="pvp-lobby-card">
+              <div class="pvp-lobby-header">
+                <h3>Thiết Lập Trận Đấu 60 Câu</h3>
+                <p>Chọn phương thức đối kháng, nhập tên và sẵn sàng bước vào trận chiến trí tuệ!</p>
+              </div>
+
+              <!-- Mode Selection Tabs -->
+              <div class="pvp-mode-selector">
+                <button class="pvp-mode-btn active" data-pvp-type="online" id="pvp-btn-type-online">
+                  <span>🌐 Đấu Online (Mã phòng)</span>
+                </button>
+                <button class="pvp-mode-btn" data-pvp-type="local" id="pvp-btn-type-local">
+                  <span>👥 Chơi 1 Máy (Pass & Play)</span>
+                </button>
+                <button class="pvp-mode-btn" data-pvp-type="bot" id="pvp-btn-type-bot">
+                  <span>🤖 Đấu Với Bot AI</span>
+                </button>
+              </div>
+
+              <!-- Profile Setup -->
+              <div class="pvp-profile-form">
+                <label class="pvp-form-label">Tên và Avatar của bạn:</label>
+                <div class="pvp-profile-inputs">
+                  <div class="pvp-avatar-picker" id="pvp-avatar-picker">
+                    <button class="avatar-opt active" data-avatar="👨‍🏫">👨‍🏫</button>
+                    <button class="avatar-opt" data-avatar="🧙‍♂️">🧙‍♂️</button>
+                    <button class="avatar-opt" data-avatar="⚔️">⚔️</button>
+                    <button class="avatar-opt" data-avatar="🦅">🦅</button>
+                    <button class="avatar-opt" data-avatar="⚡">⚡</button>
+                    <button class="avatar-opt" data-avatar="👑">👑</button>
+                  </div>
+                  <input type="text" id="pvp-player-name" class="pvp-input" placeholder="Nhập tên của bạn..." maxlength="15" value="Triết Gia Trẻ">
+                </div>
+              </div>
+
+              <!-- Tab Online Content -->
+              <div class="pvp-tab-panel" id="pvp-panel-online">
+                <div class="pvp-online-grid">
+                  <!-- Tạo phòng -->
+                  <div class="pvp-box pvp-box-create">
+                    <h4>1. Tạo Phòng Mới</h4>
+                    <p>Tạo mã phòng và gửi cho bạn bè để bắt đầu trận PK</p>
+                    <button class="btn-primary btn-block" id="btn-pvp-create-room">
+                      <span>Tạo Phòng & Lấy Mã</span>
+                    </button>
+                    <div class="pvp-created-room-info hide" id="pvp-created-room-info">
+                      <div class="room-code-display">
+                        <span class="label">Mã phòng:</span>
+                        <strong class="code-val" id="display-room-code">------</strong>
+                        <button class="btn-copy-code" id="btn-copy-room-code" title="Sao chép mã phòng">📋</button>
+                      </div>
+                      <div class="room-link-box">
+                        <input type="text" readonly id="display-room-link" class="pvp-input pvp-input-sm" value="">
+                        <button class="btn-secondary" id="btn-copy-room-link">Sao chép Link</button>
+                      </div>
+                      <div class="pvp-waiting-pulse">
+                        <div class="pulse-ring"></div>
+                        <span>Đang đợi đối thủ vào phòng...</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Vào phòng -->
+                  <div class="pvp-box pvp-box-join">
+                    <h4>2. Vào Phòng Đã Có</h4>
+                    <p>Nhập mã phòng bạn bè đã gửi cho bạn</p>
+                    <div class="pvp-join-input-wrap">
+                      <input type="text" id="input-join-room-code" class="pvp-input" placeholder="Ví dụ: MLN-842" maxlength="12">
+                      <button class="btn-primary btn-block" id="btn-pvp-join-room">
+                        <span>Tham Gia Phòng</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab Local Content -->
+              <div class="pvp-tab-panel hide" id="pvp-panel-local">
+                <div class="pvp-local-setup">
+                  <div class="local-player-row">
+                    <label>Người Chơi 1 (P1):</label>
+                    <input type="text" id="local-p1-name" class="pvp-input" value="Người Chơi 1">
+                  </div>
+                  <div class="local-player-row">
+                    <label>Người Chơi 2 (P2):</label>
+                    <input type="text" id="local-p2-name" class="pvp-input" value="Người Chơi 2">
+                  </div>
+                  <button class="btn-primary btn-block btn-lg" id="btn-start-local-game">
+                    <span>⚔️ Bắt Đầu Đấu Trên Máy Này</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tab Bot Content -->
+              <div class="pvp-tab-panel hide" id="pvp-panel-bot">
+                <div class="pvp-bot-setup">
+                  <label class="pvp-form-label">Chọn Trình Độ Bot Triết Học:</label>
+                  <div class="bot-difficulty-selector">
+                    <button class="bot-diff-btn" data-diff="easy">
+                      <span class="diff-title">🌱 Tập Sự (Dễ)</span>
+                      <span class="diff-desc">50% trả lời đúng, suy nghĩ 3-5s</span>
+                    </button>
+                    <button class="bot-diff-btn active" data-diff="medium">
+                      <span class="diff-title">⚡ Triết Gia (Vừa)</span>
+                      <span class="diff-desc">75% trả lời đúng, suy nghĩ 2-4s</span>
+                    </button>
+                    <button class="bot-diff-btn" data-diff="hard">
+                      <span class="diff-title">🔥 Hêghen AI (Khó)</span>
+                      <span class="diff-desc">92% trả lời đúng, suy nghĩ 1-3s</span>
+                    </button>
+                  </div>
+                  <button class="btn-primary btn-block btn-lg" id="btn-start-bot-game">
+                    <span>🤖 Bắt Đầu Đấu Với Bot</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- PvP Subview B: Bàn Cờ Thi Đấu 60 Ô Số (Arena) -->
+          <div class="pvp-arena hide" id="pvp-arena">
+            <!-- Top Match Status Header -->
+            <div class="pvp-match-header">
+              <!-- Player 1 Profile Card -->
+              <div class="player-hud hud-p1" id="hud-p1">
+                <div class="hud-avatar" id="p1-avatar">👨‍🏫</div>
+                <div class="hud-info">
+                  <div class="hud-name" id="p1-name">Người Chơi 1</div>
+                  <div class="hud-lives" id="p1-lives">
+                    <span class="heart active">❤️</span>
+                    <span class="heart active">❤️</span>
+                    <span class="heart active">❤️</span>
+                  </div>
+                  <div class="hud-score-badge"><span id="p1-score">0</span> điểm • <span id="p1-correct-count">0</span>/60 ô</div>
+                </div>
+              </div>
+
+              <!-- Middle VS & Turn State -->
+              <div class="pvp-center-indicator">
+                <div class="pvp-turn-banner" id="pvp-turn-banner">
+                  <span class="turn-pulse-icon">🎯</span>
+                  <span class="turn-text" id="pvp-turn-text">LƯỢT CỦA BẠN</span>
+                </div>
+                <div class="pvp-turn-timer" id="pvp-turn-timer-container">
+                  <span class="timer-icon">⏳</span>
+                  <span class="timer-sec" id="pvp-timer-sec">25s</span>
+                </div>
+                <div class="pvp-subturn-note" id="pvp-subturn-note">Chọn 1 trong 60 ô số bên dưới</div>
+              </div>
+
+              <!-- Player 2 Profile Card -->
+              <div class="player-hud hud-p2" id="hud-p2">
+                <div class="hud-avatar" id="p2-avatar">🧙‍♂️</div>
+                <div class="hud-info">
+                  <div class="hud-name" id="p2-name">Người Chơi 2</div>
+                  <div class="hud-lives" id="p2-lives">
+                    <span class="heart active">❤️</span>
+                    <span class="heart active">❤️</span>
+                    <span class="heart active">❤️</span>
+                  </div>
+                  <div class="hud-score-badge"><span id="p2-score">0</span> điểm • <span id="p2-correct-count">0</span>/60 ô</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Emote Bar -->
+            <div class="pvp-emotes-bar">
+              <span class="emotes-label">Gửi cảm xúc:</span>
+              <button class="emote-btn" data-emote="🔥">🔥</button>
+              <button class="emote-btn" data-emote="👏">👏</button>
+              <button class="emote-btn" data-emote="🧠">🧠</button>
+              <button class="emote-btn" data-emote="😱">😱</button>
+              <button class="emote-btn" data-emote="😂">😂</button>
+              <button class="emote-btn" data-emote="⚔️">⚔️</button>
+              <button class="emote-btn" data-emote="💔">💔</button>
+            </div>
+
+            <!-- Floating Emote Display Area -->
+            <div class="pvp-emote-floating-layer" id="pvp-floating-layer"></div>
+
+            <!-- Board Stats Info -->
+            <div class="pvp-board-meta">
+              <span>Đề thi: <strong>60 câu hỏi</strong> ngẫu nhiên</span>
+              <span>Đã mở: <strong id="pvp-opened-count">0</strong>/60 ô</span>
+              <span class="legend-row">
+                <span class="legend-chip p1-chip">P1 chiếm</span>
+                <span class="legend-chip p2-chip">P2 chiếm</span>
+                <span class="legend-chip wrong-chip">Hỏng (Sai)</span>
+              </span>
+            </div>
+
+            <!-- 60-Tile Board Grid -->
+            <div class="pvp-tiles-grid" id="pvp-tiles-grid">
+              <!-- Dynamically generated 60 numbered tiles (1 to 60) -->
+            </div>
+          </div>
+
+          <!-- Question Battle Modal (Show cho cả 2 người cùng xem khi 1 ô số được chọn) -->
+          <div class="battle-modal-backdrop hide" id="battle-modal">
+            <div class="battle-modal-card">
+              <div class="battle-modal-header">
+                <div class="battle-badge" id="battle-q-badge">Ô SỐ #40 • ĐANG THI ĐẤU</div>
+                <div class="battle-timer-ring">
+                  <span id="battle-timer-display">25s</span>
+                </div>
+              </div>
+
+              <div class="battle-turn-announcement" id="battle-turn-announcement">
+                <span class="player-icon" id="battle-picker-avatar">👨‍🏫</span>
+                <span class="player-msg" id="battle-picker-msg">Người Chơi 1 đang trả lời...</span>
+              </div>
+
+              <div class="battle-q-text" id="battle-question-text">
+                Nội dung câu hỏi đang tải...
+              </div>
+
+              <!-- 4 Options Grid -->
+              <div class="battle-options-grid" id="battle-options-container">
+                <!-- 4 choice buttons A, B, C, D -->
+              </div>
+
+              <!-- Battle Result Banner -->
+              <div class="battle-result-banner hide" id="battle-result-banner">
+                <div class="banner-icon" id="battle-result-icon">✅</div>
+                <div class="banner-text">
+                  <div class="banner-title" id="battle-result-title">Chính xác!</div>
+                  <div class="banner-desc" id="battle-result-desc">Đáp án đúng là: ...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PvP Game Over / Victory Modal -->
+          <div class="pvp-gameover-backdrop hide" id="pvp-gameover-modal">
+            <div class="pvp-gameover-card">
+              <div class="pvp-victory-trophy" id="pvp-victory-trophy">🏆</div>
+              <h2 class="pvp-gameover-title" id="pvp-winner-title">NGƯỜI CHIẾN THẮNG</h2>
+              <p class="pvp-gameover-reason" id="pvp-winner-reason">Đối thủ đã mất hết 3 mạng (K.O.)!</p>
+
+              <div class="pvp-final-score-cards">
+                <div class="score-card" id="card-p1-final">
+                  <div class="final-avatar" id="final-p1-avatar">👨‍🏫</div>
+                  <div class="final-name" id="final-p1-name">P1</div>
+                  <div class="final-points" id="final-p1-score">0 điểm</div>
+                  <div class="final-stats" id="final-p1-stats">Chiếm: 0 ô • Còn ❤️: 3</div>
+                </div>
+                <div class="final-vs">VS</div>
+                <div class="score-card" id="card-p2-final">
+                  <div class="final-avatar" id="final-p2-avatar">🧙‍♂️</div>
+                  <div class="final-name" id="final-p2-name">P2</div>
+                  <div class="final-points" id="final-p2-score">0 điểm</div>
+                  <div class="final-stats" id="final-p2-stats">Chiếm: 0 ô • Còn ❤️: 0</div>
+                </div>
+              </div>
+
+              <!-- Danh sách câu sai để ôn lại -->
+              <div class="pvp-wrong-review-section hide" id="pvp-wrong-review-section">
+                <h4>📚 Các câu hỏi cần ôn lại trong trận:</h4>
+                <div class="wrong-questions-list" id="pvp-wrong-list"></div>
+              </div>
+
+              <div class="pvp-gameover-actions">
+                <button class="btn-primary btn-lg" id="btn-pvp-rematch">
+                  <span>🔄 Tái Đấu (Chơi Lại Trận Mới)</span>
+                </button>
+                <button class="btn-secondary" id="btn-pvp-leave">
+                  <span>Về Sảnh Game</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- GAME 2: LEO THÁP TRIẾT GIA (BOSS BATTLE) -->
+        <!-- ============================================================ -->
+        <div class="game-screen hide" id="game-boss-screen">
+          <div class="game-screen-topbar">
+            <button class="btn-back-hub" id="btn-boss-back-hub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              <span>Về Sảnh Game</span>
+            </button>
+            <div class="game-screen-title-tag">🏰 LEO THÁP TRIẾT GIA (BOSS BATTLE)</div>
+            <div class="boss-floor-badge" id="boss-floor-badge">Tầng 1 / 3</div>
+          </div>
+
+          <div class="boss-battle-arena">
+            <!-- Boss Status Bar -->
+            <div class="boss-card-hud" id="boss-hud">
+              <div class="boss-visual-wrap">
+                <div class="boss-sprite" id="boss-sprite">👹</div>
+                <div class="boss-hit-slash hide" id="boss-hit-slash">💥 -150</div>
+              </div>
+              <div class="boss-info">
+                <div class="boss-name" id="boss-name">Boss: Thần Học Trung Cổ</div>
+                <div class="boss-hp-track">
+                  <div class="boss-hp-fill" id="boss-hp-fill" style="width: 100%;"></div>
+                </div>
+                <div class="boss-hp-text"><span id="boss-hp-cur">300</span> / <span id="boss-hp-max">300</span> HP</div>
+              </div>
+            </div>
+
+            <!-- Player Status & Combo -->
+            <div class="boss-player-hud">
+              <div class="player-hearts" id="boss-player-hearts">
+                <span class="heart active">❤️</span>
+                <span class="heart active">❤️</span>
+                <span class="heart active">❤️</span>
+              </div>
+              <div class="combo-indicator" id="boss-combo-indicator">
+                <span class="combo-flame">🔥</span>
+                <span>Combo: <strong id="boss-combo-val">0</strong></span>
+              </div>
+              <div class="boss-player-score">Điểm: <strong id="boss-score-val">0</strong></div>
+            </div>
+
+            <!-- Question Card for Boss Fight -->
+            <div class="boss-question-card">
+              <div class="boss-q-num" id="boss-q-num">Câu Hỏi Tấn Công #1</div>
+              <div class="boss-q-text" id="boss-q-text">Đang triệu hồi câu hỏi...</div>
+              <div class="boss-options-grid" id="boss-options-grid"></div>
+              <div class="boss-feedback-box hide" id="boss-feedback-box">
+                <span id="boss-feedback-text"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- GAME 3: ĐUA TỐC ĐỘ 60S (SPEED RUN BLITZ) -->
+        <!-- ============================================================ -->
+        <div class="game-screen hide" id="game-speed-screen">
+          <div class="game-screen-topbar">
+            <button class="btn-back-hub" id="btn-speed-back-hub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              <span>Về Sảnh Game</span>
+            </button>
+            <div class="game-screen-title-tag">⚡ ĐUA TỐC ĐỘ 60S BLITZ</div>
+            <div class="speed-record-badge">Kỷ lục: <strong id="speed-high-score">0</strong></div>
+          </div>
+
+          <div class="speed-arena">
+            <!-- Start Screen -->
+            <div class="speed-start-view" id="speed-start-view">
+              <div class="speed-icon-huge">⚡</div>
+              <h2>Chạy Đua Với Thời Gian</h2>
+              <p>Mỗi câu đúng: <strong>+5 Giây</strong> • Câu sai: <strong>-3 Giây</strong></p>
+              <p>Đúng 3 câu liên tiếp để kích hoạt <strong>Bốc Hỏa Fever (x2, x3 Điểm)</strong>!</p>
+              <button class="btn-primary btn-lg" id="btn-speed-start">
+                <span>Bắt Đầu Đua Ngay 🚀</span>
+              </button>
+            </div>
+
+            <!-- Active Speed Game View -->
+            <div class="speed-active-view hide" id="speed-active-view">
+              <div class="speed-hud-bar">
+                <div class="speed-timer-box" id="speed-timer-box">
+                  <span class="timer-label">Thời gian:</span>
+                  <span class="timer-number" id="speed-timer-number">60.0s</span>
+                </div>
+                <div class="speed-fever-badge" id="speed-fever-badge">
+                  <span class="fever-text">FEVER x1</span>
+                </div>
+                <div class="speed-score-box">
+                  <span class="score-label">Điểm số:</span>
+                  <span class="score-number" id="speed-current-score">0</span>
+                </div>
+              </div>
+
+              <div class="speed-question-card">
+                <div class="speed-q-meta" id="speed-q-meta">Câu #1</div>
+                <div class="speed-q-text" id="speed-q-text">Câu hỏi tốc độ...</div>
+                <div class="speed-options-grid" id="speed-options-grid"></div>
+              </div>
+            </div>
+
+            <!-- Speed Result View -->
+            <div class="speed-result-view hide" id="speed-result-view">
+              <div class="result-icon">🏁</div>
+              <h2>Hết Giờ!</h2>
+              <div class="final-speed-score" id="final-speed-score">0 Điểm</div>
+              <p id="final-speed-summary">Bạn đã trả lời đúng 0/0 câu.</p>
+              <button class="btn-primary btn-lg" id="btn-speed-retry">
+                <span>🔄 Chơi Lại</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- GAME 4: LẬT THẺ GHÉP CẶP (MEMORY MATCH) -->
+        <!-- ============================================================ -->
+        <div class="game-screen hide" id="game-memory-screen">
+          <div class="game-screen-topbar">
+            <button class="btn-back-hub" id="btn-memory-back-hub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              <span>Về Sảnh Game</span>
+            </button>
+            <div class="game-screen-title-tag">🧩 LẬT THẺ GHÉP CẶP TRIẾT HỌC</div>
+            <button class="btn-ghost" id="btn-memory-restart">Làm Mới Bàn</button>
+          </div>
+
+          <div class="memory-arena">
+            <div class="memory-hud-bar">
+              <div>Số cặp đã ghép: <strong id="memory-pairs-found">0 / 8</strong></div>
+              <div>Số lượt lật: <strong id="memory-turns-count">0</strong></div>
+              <div>Thời gian: <strong id="memory-timer-text">00:00</strong></div>
+            </div>
+
+            <!-- 16-Card Grid -->
+            <div class="memory-cards-grid" id="memory-cards-grid">
+              <!-- Dynamically generated 16 cards -->
+            </div>
+
+            <div class="memory-victory-modal hide" id="memory-victory-modal">
+              <div class="victory-card">
+                <div class="victory-icon">🎉</div>
+                <h3>Hoàn Thành Xuất Sắc!</h3>
+                <p id="memory-victory-stats">Bạn đã ghép thành công 8 cặp triết học trong 0 lượt và 0 giây.</p>
+                <button class="btn-primary" id="btn-memory-play-again">Chơi Ván Mới</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <!-- Footer -->
@@ -473,7 +1012,7 @@
   <div class="toast hide" id="app-toast" role="status" aria-live="polite"></div>
 
   <!-- App Scripts -->
-  <script src="app.js?v=2.0"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 
 </html>

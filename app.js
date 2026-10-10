@@ -5273,9 +5273,13 @@
     tabFlashcard: document.getElementById('tab-flashcard'),
     tabQuiz: document.getElementById('tab-quiz'),
     tabList: document.getElementById('tab-list'),
+    tabGames: document.getElementById('tab-games'),
     viewFlashcard: document.getElementById('view-flashcard'),
     viewQuiz: document.getElementById('view-quiz'),
     viewList: document.getElementById('view-list'),
+    viewGames: document.getElementById('view-games'),
+    toolbarSection: document.querySelector('.toolbar-section'),
+    progressContainer: document.querySelector('.progress-container'),
 
     // Global tools
     btnSoundToggle: document.getElementById('btn-sound-toggle'),
@@ -5429,6 +5433,55 @@
 
   function playClickSound() {
     playTone(450, 'sine', 0.06, 0.04);
+  }
+
+  function playVictorySound() {
+    if (!state.soundEnabled) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.12 + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + idx * 0.12 + 0.35);
+      });
+    } catch (e) {}
+  }
+
+  function playHeartLossSound() {
+    if (!state.soundEnabled) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const notes = [330, 260, 180];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.1 + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.1);
+        osc.stop(ctx.currentTime + idx * 0.1 + 0.2);
+      });
+    } catch (e) {}
+  }
+
+  function playSlashSound() {
+    playTone(550, 'triangle', 0.09, 0.14);
+  }
+
+  function playComboSound() {
+    playTone(880, 'sine', 0.15, 0.1);
   }
 
   // 4. TEXT TO SPEECH (Vietnamese)
@@ -6026,10 +6079,16 @@
     els.tabFlashcard.classList.toggle('active', mode === 'flashcard');
     els.tabQuiz.classList.toggle('active', mode === 'quiz');
     els.tabList.classList.toggle('active', mode === 'list');
+    if (els.tabGames) els.tabGames.classList.toggle('active', mode === 'games');
 
     els.viewFlashcard.classList.toggle('active', mode === 'flashcard');
     els.viewQuiz.classList.toggle('active', mode === 'quiz');
     els.viewList.classList.toggle('active', mode === 'list');
+    if (els.viewGames) els.viewGames.classList.toggle('active', mode === 'games');
+
+    // Toggle visibility of top toolbar & progress bar for immersive full-screen game mode
+    if (els.toolbarSection) els.toolbarSection.classList.toggle('hide', mode === 'games');
+    if (els.progressContainer) els.progressContainer.classList.toggle('hide', mode === 'games');
 
     if (mode === 'quiz') {
       initQuiz();
@@ -6037,6 +6096,8 @@
       updateFlashcardView();
     } else if (mode === 'list') {
       updateListView();
+    } else if (mode === 'games') {
+      if (typeof returnToGamesHub === 'function') returnToGamesHub();
     }
 
     playClickSound();
@@ -6059,6 +6120,7 @@
     els.tabFlashcard.addEventListener('click', () => switchMode('flashcard'));
     els.tabQuiz.addEventListener('click', () => switchMode('quiz'));
     els.tabList.addEventListener('click', () => switchMode('list'));
+    if (els.tabGames) els.tabGames.addEventListener('click', () => switchMode('games'));
 
     // Sound & Theme
     els.btnSoundToggle.addEventListener('click', toggleSound);
@@ -6259,7 +6321,1479 @@
     });
   }
 
-  // 14. SECURITY / ANTI-INSPECT PROTECTION
+  // ==========================================================================
+  // 14. GAME CENTER & PVP ARENA ENGINE
+  // ==========================================================================
+  let returnToGamesHub = null;
+
+  function initGamesModule() {
+    // ------------------------------------------------------------------------
+    // Helper: Generate 60 Standardized Questions with 4 Shuffled Options
+    // ------------------------------------------------------------------------
+    function get60RandomQuestions() {
+      const list = [...state.allQuestions];
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+      const selected = list.slice(0, Math.min(60, list.length));
+
+      return selected.map((q, idx) => {
+        let opts = Array.isArray(q.options) ? [...q.options] : [];
+        if (opts.length < 4) {
+          const otherAns = state.allQuestions
+            .filter(o => o.id !== q.id && o.answer && !opts.includes(o.answer))
+            .map(o => o.answer);
+          while (opts.length < 4 && otherAns.length > 0) {
+            const rIdx = Math.floor(Math.random() * otherAns.length);
+            opts.push(otherAns.splice(rIdx, 1)[0]);
+          }
+        }
+        if (!opts.includes(q.answer)) {
+          if (opts.length >= 4) opts[3] = q.answer;
+          else opts.push(q.answer);
+        }
+        // Shuffle options
+        for (let i = opts.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [opts[i], opts[j]] = [opts[j], opts[i]];
+        }
+        return {
+          id: q.id,
+          num: idx + 1,
+          chapter: q.chapter || 'Triết học Mác - Lênin',
+          question: q.question,
+          options: opts,
+          answer: q.answer,
+          correctIdx: opts.indexOf(q.answer)
+        };
+      });
+    }
+
+    function triggerConfetti() {
+      if (typeof window.confetti === 'function') {
+        try {
+          window.confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        } catch (e) {}
+      }
+    }
+
+    function triggerFloatingEmote(emote) {
+      const layer = document.getElementById('pvp-floating-layer');
+      if (!layer) return;
+      const bubble = document.createElement('div');
+      bubble.className = 'floating-emote-bubble';
+      bubble.textContent = emote;
+      bubble.style.left = `${Math.floor(20 + Math.random() * 60)}%`;
+      bubble.style.bottom = '120px';
+      layer.appendChild(bubble);
+      setTimeout(() => {
+        if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+      }, 2300);
+    }
+
+    // ------------------------------------------------------------------------
+    // Hub Navigation & Sub-screen switching
+    // ------------------------------------------------------------------------
+    const hub = document.getElementById('games-hub');
+    const pvpScreen = document.getElementById('game-pvp-screen');
+    const bossScreen = document.getElementById('game-boss-screen');
+    const speedScreen = document.getElementById('game-speed-screen');
+    const memoryScreen = document.getElementById('game-memory-screen');
+
+    returnToGamesHub = function() {
+      if (pvpState.timer) clearInterval(pvpState.timer);
+      if (speedState.timer) clearInterval(speedState.timer);
+      if (memoryState.timer) clearInterval(memoryState.timer);
+
+      pvpScreen.classList.add('hide');
+      bossScreen.classList.add('hide');
+      speedScreen.classList.add('hide');
+      memoryScreen.classList.add('hide');
+      hub.classList.remove('hide');
+    };
+
+    function openGameScreen(targetScreen) {
+      hub.classList.add('hide');
+      pvpScreen.classList.add('hide');
+      bossScreen.classList.add('hide');
+      speedScreen.classList.add('hide');
+      memoryScreen.classList.add('hide');
+      targetScreen.classList.remove('hide');
+    }
+
+    // Hub buttons
+    document.getElementById('btn-open-pvp').addEventListener('click', () => {
+      openGameScreen(pvpScreen);
+      resetPvpToLobby();
+      playClickSound();
+    });
+    document.getElementById('btn-open-boss').addEventListener('click', () => {
+      openGameScreen(bossScreen);
+      startBossGame();
+      playClickSound();
+    });
+    document.getElementById('btn-open-speed').addEventListener('click', () => {
+      openGameScreen(speedScreen);
+      resetSpeedGame();
+      playClickSound();
+    });
+    document.getElementById('btn-open-memory').addEventListener('click', () => {
+      openGameScreen(memoryScreen);
+      initMemoryGame();
+      playClickSound();
+    });
+
+    // Back to hub buttons
+    document.getElementById('btn-pvp-back-hub').addEventListener('click', () => {
+      returnToGamesHub();
+      playClickSound();
+    });
+    document.getElementById('btn-boss-back-hub').addEventListener('click', () => {
+      returnToGamesHub();
+      playClickSound();
+    });
+    document.getElementById('btn-speed-back-hub').addEventListener('click', () => {
+      returnToGamesHub();
+      playClickSound();
+    });
+    document.getElementById('btn-memory-back-hub').addEventListener('click', () => {
+      returnToGamesHub();
+      playClickSound();
+    });
+
+    // ------------------------------------------------------------------------
+    // GAME 1: PVP 60 CÂU ĐỀ THI (TURN-BASED 60-TILES ARENA)
+    // ------------------------------------------------------------------------
+    const pvpState = {
+      mode: 'online', // 'online' | 'local' | 'bot'
+      role: 'host', // 'host' | 'guest' | 'p1' | 'p2'
+      peer: null,
+      conn: null,
+      roomCode: '',
+      questions: [],
+      tiles: [], // 60 items
+      p1: { name: 'Người Chơi 1', avatar: '👨‍🏫', lives: 3, score: 0, correct: 0 },
+      p2: { name: 'Người Chơi 2', avatar: '🧙‍♂️', lives: 3, score: 0, correct: 0 },
+      currentTurn: 'p1', // 'p1' | 'p2'
+      activeTileIdx: null,
+      isAnswering: false,
+      timer: null,
+      timeLeft: 25,
+      botDiff: 'medium',
+      wrongQuestions: []
+    };
+
+    const pvpEls = {
+      lobby: document.getElementById('pvp-lobby'),
+      arena: document.getElementById('pvp-arena'),
+      connBadge: document.getElementById('pvp-conn-badge'),
+      connText: document.getElementById('pvp-conn-text'),
+      playerNameInput: document.getElementById('pvp-player-name'),
+      avatarOpts: document.querySelectorAll('.avatar-opt'),
+
+      // Mode tabs
+      btnOnline: document.getElementById('pvp-btn-type-online'),
+      btnLocal: document.getElementById('pvp-btn-type-local'),
+      btnBot: document.getElementById('pvp-btn-type-bot'),
+      panelOnline: document.getElementById('pvp-panel-online'),
+      panelLocal: document.getElementById('pvp-panel-local'),
+      panelBot: document.getElementById('pvp-panel-bot'),
+
+      // Online controls
+      btnCreateRoom: document.getElementById('btn-pvp-create-room'),
+      createdRoomInfo: document.getElementById('pvp-created-room-info'),
+      displayRoomCode: document.getElementById('display-room-code'),
+      btnCopyRoomCode: document.getElementById('btn-copy-room-code'),
+      displayRoomLink: document.getElementById('display-room-link'),
+      btnCopyRoomLink: document.getElementById('btn-copy-room-link'),
+      inputJoinRoomCode: document.getElementById('input-join-room-code'),
+      btnJoinRoom: document.getElementById('btn-pvp-join-room'),
+
+      // Local controls
+      localP1Name: document.getElementById('local-p1-name'),
+      localP2Name: document.getElementById('local-p2-name'),
+      btnStartLocal: document.getElementById('btn-start-local-game'),
+
+      // Bot controls
+      botDiffBtns: document.querySelectorAll('.bot-diff-btn'),
+      btnStartBot: document.getElementById('btn-start-bot-game'),
+
+      // Arena Header
+      p1Avatar: document.getElementById('p1-avatar'),
+      p1Name: document.getElementById('p1-name'),
+      p1Lives: document.getElementById('p1-lives'),
+      p1Score: document.getElementById('p1-score'),
+      p1CorrectCount: document.getElementById('p1-correct-count'),
+
+      p2Avatar: document.getElementById('p2-avatar'),
+      p2Name: document.getElementById('p2-name'),
+      p2Lives: document.getElementById('p2-lives'),
+      p2Score: document.getElementById('p2-score'),
+      p2CorrectCount: document.getElementById('p2-correct-count'),
+
+      hudP1: document.getElementById('hud-p1'),
+      hudP2: document.getElementById('hud-p2'),
+      turnBanner: document.getElementById('pvp-turn-banner'),
+      turnText: document.getElementById('pvp-turn-text'),
+      timerSec: document.getElementById('pvp-timer-sec'),
+      subturnNote: document.getElementById('pvp-subturn-note'),
+      openedCount: document.getElementById('pvp-opened-count'),
+      tilesGrid: document.getElementById('pvp-tiles-grid'),
+
+      // Question Battle Modal
+      battleModal: document.getElementById('battle-modal'),
+      battleBadge: document.getElementById('battle-q-badge'),
+      battleTimer: document.getElementById('battle-timer-display'),
+      battlePickerAvatar: document.getElementById('battle-picker-avatar'),
+      battlePickerMsg: document.getElementById('battle-picker-msg'),
+      battleQText: document.getElementById('battle-question-text'),
+      battleOptionsGrid: document.getElementById('battle-options-container'),
+      battleResultBanner: document.getElementById('battle-result-banner'),
+      battleResultIcon: document.getElementById('battle-result-icon'),
+      battleResultTitle: document.getElementById('battle-result-title'),
+      battleResultDesc: document.getElementById('battle-result-desc'),
+
+      // Game Over Modal
+      gameOverModal: document.getElementById('pvp-gameover-modal'),
+      winnerTitle: document.getElementById('pvp-winner-title'),
+      winnerReason: document.getElementById('pvp-winner-reason'),
+      finalP1Avatar: document.getElementById('final-p1-avatar'),
+      finalP1Name: document.getElementById('final-p1-name'),
+      finalP1Score: document.getElementById('final-p1-score'),
+      finalP1Stats: document.getElementById('final-p1-stats'),
+      finalP2Avatar: document.getElementById('final-p2-avatar'),
+      finalP2Name: document.getElementById('final-p2-name'),
+      finalP2Score: document.getElementById('final-p2-score'),
+      finalP2Stats: document.getElementById('final-p2-stats'),
+      cardP1Final: document.getElementById('card-p1-final'),
+      cardP2Final: document.getElementById('card-p2-final'),
+      wrongReviewSection: document.getElementById('pvp-wrong-review-section'),
+      wrongList: document.getElementById('pvp-wrong-list'),
+      btnRematch: document.getElementById('btn-pvp-rematch'),
+      btnLeave: document.getElementById('btn-pvp-leave'),
+
+      // Emotes
+      emoteBtns: document.querySelectorAll('.emote-btn')
+    };
+
+    function resetPvpToLobby() {
+      pvpEls.lobby.classList.remove('hide');
+      pvpEls.arena.classList.add('hide');
+      pvpEls.gameOverModal.classList.add('hide');
+      pvpEls.battleModal.classList.add('hide');
+      pvpEls.createdRoomInfo.classList.add('hide');
+      pvpEls.connBadge.classList.remove('online');
+      pvpEls.connText.textContent = 'Chưa kết nối';
+    }
+
+    // Tab Switching in Lobby
+    pvpEls.btnOnline.addEventListener('click', () => switchPvpLobbyTab('online'));
+    pvpEls.btnLocal.addEventListener('click', () => switchPvpLobbyTab('local'));
+    pvpEls.btnBot.addEventListener('click', () => switchPvpLobbyTab('bot'));
+
+    function switchPvpLobbyTab(mode) {
+      pvpState.mode = mode;
+      pvpEls.btnOnline.classList.toggle('active', mode === 'online');
+      pvpEls.btnLocal.classList.toggle('active', mode === 'local');
+      pvpEls.btnBot.classList.toggle('active', mode === 'bot');
+
+      pvpEls.panelOnline.classList.toggle('hide', mode !== 'online');
+      pvpEls.panelLocal.classList.toggle('hide', mode !== 'local');
+      pvpEls.panelBot.classList.toggle('hide', mode !== 'bot');
+      playClickSound();
+    }
+
+    // Avatar Picker
+    pvpEls.avatarOpts.forEach(opt => {
+      opt.addEventListener('click', () => {
+        pvpEls.avatarOpts.forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        playClickSound();
+      });
+    });
+
+    function getSelectedAvatar() {
+      const active = document.querySelector('.avatar-opt.active');
+      return active ? active.getAttribute('data-avatar') : '👨‍🏫';
+    }
+
+    // Bot Difficulty
+    pvpEls.botDiffBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        pvpEls.botDiffBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        pvpState.botDiff = btn.getAttribute('data-diff');
+        playClickSound();
+      });
+    });
+
+    // Emotes Interaction
+    pvpEls.emoteBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emote = btn.getAttribute('data-emote');
+        triggerFloatingEmote(emote);
+        if (pvpState.mode === 'online' && pvpState.conn && pvpState.conn.open) {
+          pvpState.conn.send({ type: 'EMOTE', emote });
+        }
+      });
+    });
+
+    // Copy Room Code & Link
+    pvpEls.btnCopyRoomCode.addEventListener('click', () => {
+      if (pvpState.roomCode) {
+        navigator.clipboard.writeText(pvpState.roomCode);
+        showToast(`Đã sao chép mã phòng: ${pvpState.roomCode} 📋`);
+      }
+    });
+    pvpEls.btnCopyRoomLink.addEventListener('click', () => {
+      if (pvpEls.displayRoomLink.value) {
+        navigator.clipboard.writeText(pvpEls.displayRoomLink.value);
+        showToast('Đã sao chép liên kết mời phòng đấu 🔗');
+      }
+    });
+
+    // ------------------------------------------------------------------------
+    // PvP Online Networking (PeerJS WebRTC)
+    // ------------------------------------------------------------------------
+    function generateRoomCode() {
+      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+      let res = 'MLN-';
+      for (let i = 0; i < 4; i++) {
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return res;
+    }
+
+    pvpEls.btnCreateRoom.addEventListener('click', () => {
+      const name = pvpEls.playerNameInput.value.trim() || 'Triết Gia 1';
+      const avatar = getSelectedAvatar();
+      pvpState.p1 = { name, avatar, lives: 3, score: 0, correct: 0 };
+      pvpState.role = 'host';
+
+      if (typeof Peer === 'undefined') {
+        showToast('⚠️ Không thể tải thư viện P2P. Bạn có thể chọn Chơi 1 Máy hoặc Đấu Bot!');
+        return;
+      }
+
+      pvpState.roomCode = generateRoomCode();
+      const peerId = `mln111-${pvpState.roomCode.toLowerCase()}`;
+
+      pvpEls.btnCreateRoom.disabled = true;
+      pvpEls.btnCreateRoom.textContent = 'Đang khởi tạo phòng...';
+
+      try {
+        if (pvpState.peer) pvpState.peer.destroy();
+        pvpState.peer = new Peer(peerId);
+
+        pvpState.peer.on('open', (id) => {
+          pvpEls.btnCreateRoom.disabled = false;
+          pvpEls.btnCreateRoom.textContent = 'Tạo Phòng & Lấy Mã';
+          pvpEls.displayRoomCode.textContent = pvpState.roomCode;
+
+          const joinUrl = `${window.location.origin}${window.location.pathname}?room=${pvpState.roomCode}`;
+          pvpEls.displayRoomLink.value = joinUrl;
+          pvpEls.createdRoomInfo.classList.remove('hide');
+
+          pvpEls.connBadge.classList.add('online');
+          pvpEls.connText.textContent = `Phòng: ${pvpState.roomCode}`;
+          showToast(`Phòng ${pvpState.roomCode} đã sẵn sàng! Gửi mã cho đối thủ để bắt đầu.`);
+        });
+
+        pvpState.peer.on('connection', (conn) => {
+          pvpState.conn = conn;
+          setupConnectionListeners(conn);
+        });
+
+        pvpState.peer.on('error', (err) => {
+          console.warn('Peer error:', err);
+          pvpEls.btnCreateRoom.disabled = false;
+          pvpEls.btnCreateRoom.textContent = 'Tạo Phòng & Lấy Mã';
+          showToast('⚠️ Kết nối máy chủ P2P thất bại, hãy thử tạo lại hoặc chọn Chơi 1 Máy.');
+        });
+      } catch (err) {
+        showToast('⚠️ Lỗi tạo phòng P2P.');
+        pvpEls.btnCreateRoom.disabled = false;
+      }
+    });
+
+    pvpEls.btnJoinRoom.addEventListener('click', () => {
+      const code = pvpEls.inputJoinRoomCode.value.trim().toUpperCase();
+      if (!code) {
+        showToast('Vui lòng nhập mã phòng (Ví dụ: MLN-842)');
+        return;
+      }
+      const name = pvpEls.playerNameInput.value.trim() || 'Triết Gia 2';
+      const avatar = getSelectedAvatar();
+      pvpState.p2 = { name, avatar, lives: 3, score: 0, correct: 0 };
+      pvpState.role = 'guest';
+      pvpState.roomCode = code;
+
+      if (typeof Peer === 'undefined') {
+        showToast('⚠️ Không thể tải thư viện P2P. Bạn có thể chọn Chơi 1 Máy hoặc Đấu Bot!');
+        return;
+      }
+
+      pvpEls.btnJoinRoom.disabled = true;
+      pvpEls.btnJoinRoom.textContent = 'Đang kết nối vào phòng...';
+
+      try {
+        if (pvpState.peer) pvpState.peer.destroy();
+        pvpState.peer = new Peer();
+
+        pvpState.peer.on('open', () => {
+          const targetPeerId = `mln111-${code.toLowerCase()}`;
+          const conn = pvpState.peer.connect(targetPeerId);
+          pvpState.conn = conn;
+          setupConnectionListeners(conn);
+        });
+
+        pvpState.peer.on('error', (err) => {
+          console.warn('Join error:', err);
+          pvpEls.btnJoinRoom.disabled = false;
+          pvpEls.btnJoinRoom.textContent = 'Tham Gia Phòng';
+          showToast('⚠️ Không tìm thấy phòng hoặc mã phòng không đúng.');
+        });
+      } catch (e) {
+        pvpEls.btnJoinRoom.disabled = false;
+        showToast('⚠️ Lỗi tham gia phòng.');
+      }
+    });
+
+    function setupConnectionListeners(conn) {
+      conn.on('open', () => {
+        pvpEls.connBadge.classList.add('online');
+        pvpEls.connText.textContent = 'Đã kết nối!';
+        showToast('🎉 Đối thủ đã vào phòng! Trận đấu 60 câu bắt đầu!');
+
+        if (pvpState.role === 'host') {
+          // Host generates 60 questions and sends to guest
+          pvpState.questions = get60RandomQuestions();
+          conn.send({
+            type: 'START_GAME',
+            questions: pvpState.questions,
+            p1: pvpState.p1
+          });
+          startPvpArena();
+        } else {
+          // Guest sends its player info to host
+          conn.send({
+            type: 'GUEST_INFO',
+            p2: pvpState.p2
+          });
+        }
+      });
+
+      conn.on('data', (data) => {
+        if (!data || !data.type) return;
+
+        if (data.type === 'GUEST_INFO' && pvpState.role === 'host') {
+          pvpState.p2 = data.p2;
+          updatePvpArenaHud();
+        } else if (data.type === 'START_GAME' && pvpState.role === 'guest') {
+          pvpState.questions = data.questions;
+          pvpState.p1 = data.p1;
+          startPvpArena();
+        } else if (data.type === 'SELECT_TILE') {
+          handleTileSelected(data.tileIdx, false);
+        } else if (data.type === 'SUBMIT_ANSWER') {
+          handleAnswerSubmitted(data.optIdx, false);
+        } else if (data.type === 'EMOTE') {
+          triggerFloatingEmote(data.emote);
+        } else if (data.type === 'REMATCH') {
+          if (pvpState.role === 'host') {
+            pvpState.questions = get60RandomQuestions();
+            conn.send({
+              type: 'START_GAME',
+              questions: pvpState.questions,
+              p1: pvpState.p1
+            });
+            startPvpArena();
+          }
+        }
+      });
+
+      conn.on('close', () => {
+        showToast('⚠️ Đối thủ đã rời phòng.');
+        pvpEls.connBadge.classList.remove('online');
+        pvpEls.connText.textContent = 'Mất kết nối';
+      });
+    }
+
+    // ------------------------------------------------------------------------
+    // Local (Pass & Play) and Bot Start Triggers
+    // ------------------------------------------------------------------------
+    pvpEls.btnStartLocal.addEventListener('click', () => {
+      const p1Name = pvpEls.localP1Name.value.trim() || 'Người Chơi 1';
+      const p2Name = pvpEls.localP2Name.value.trim() || 'Người Chơi 2';
+      pvpState.p1 = { name: p1Name, avatar: '👨‍🏫', lives: 3, score: 0, correct: 0 };
+      pvpState.p2 = { name: p2Name, avatar: '🧙‍♂️', lives: 3, score: 0, correct: 0 };
+      pvpState.mode = 'local';
+      pvpState.role = 'local';
+      pvpState.questions = get60RandomQuestions();
+      startPvpArena();
+      playClickSound();
+    });
+
+    pvpEls.btnStartBot.addEventListener('click', () => {
+      const p1Name = pvpEls.playerNameInput.value.trim() || 'Triết Gia Trẻ';
+      const avatar = getSelectedAvatar();
+      const botNames = { easy: 'Bot Tập Sự', medium: 'Bot Hêghen', hard: 'Đại Triết Gia AI' };
+      const botAvatars = { easy: '🌱', medium: '⚡', hard: '🤖' };
+
+      pvpState.p1 = { name: p1Name, avatar, lives: 3, score: 0, correct: 0 };
+      pvpState.p2 = {
+        name: botNames[pvpState.botDiff] || 'Bot AI',
+        avatar: botAvatars[pvpState.botDiff] || '🤖',
+        lives: 3,
+        score: 0,
+        correct: 0
+      };
+      pvpState.mode = 'bot';
+      pvpState.role = 'host';
+      pvpState.questions = get60RandomQuestions();
+      startPvpArena();
+      playClickSound();
+    });
+
+    // ------------------------------------------------------------------------
+    // PvP Arena: 60-Tiles Board Game Execution
+    // ------------------------------------------------------------------------
+    function startPvpArena() {
+      pvpEls.lobby.classList.add('hide');
+      pvpEls.arena.classList.remove('hide');
+      pvpEls.gameOverModal.classList.add('hide');
+      pvpEls.battleModal.classList.add('hide');
+
+      pvpState.currentTurn = 'p1';
+      pvpState.p1.lives = 3;
+      pvpState.p1.score = 0;
+      pvpState.p1.correct = 0;
+      pvpState.p2.lives = 3;
+      pvpState.p2.score = 0;
+      pvpState.p2.correct = 0;
+      pvpState.wrongQuestions = [];
+      pvpState.isAnswering = false;
+
+      // Initialize 60 tiles
+      pvpState.tiles = [];
+      for (let i = 0; i < 60; i++) {
+        pvpState.tiles.push({
+          idx: i,
+          num: i + 1,
+          status: 'unopened', // 'unopened' | 'claimed-p1' | 'claimed-p2' | 'claimed-wrong'
+          claimedBy: null
+        });
+      }
+
+      renderPvpTilesGrid();
+      updatePvpArenaHud();
+      startTurnTimer();
+    }
+
+    function renderPvpTilesGrid() {
+      pvpEls.tilesGrid.innerHTML = '';
+      let openedCount = 0;
+
+      pvpState.tiles.forEach((tile, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'pvp-tile';
+        btn.setAttribute('data-idx', idx);
+
+        if (tile.status === 'claimed-p1') {
+          btn.classList.add('claimed-p1', 'opened');
+          btn.innerHTML = `<span class="tile-num">${tile.num}</span><span class="tile-owner">P1 ⚔️</span>`;
+          openedCount++;
+        } else if (tile.status === 'claimed-p2') {
+          btn.classList.add('claimed-p2', 'opened');
+          btn.innerHTML = `<span class="tile-num">${tile.num}</span><span class="tile-owner">P2 🛡️</span>`;
+          openedCount++;
+        } else if (tile.status === 'claimed-wrong') {
+          btn.classList.add('claimed-wrong', 'opened');
+          btn.innerHTML = `<span class="tile-num">${tile.num}</span><span class="tile-owner">❌</span>`;
+          openedCount++;
+        } else {
+          btn.innerHTML = `<span class="tile-num">${tile.num}</span>`;
+          // Check turn permission
+          if (!canActivePlayerPick()) {
+            btn.classList.add('not-my-turn');
+          }
+          btn.addEventListener('click', () => onTileClick(idx));
+        }
+
+        pvpEls.tilesGrid.appendChild(btn);
+      });
+
+      pvpEls.openedCount.textContent = openedCount;
+    }
+
+    function canActivePlayerPick() {
+      if (pvpState.isAnswering) return false;
+      if (pvpState.mode === 'local') return true;
+      if (pvpState.mode === 'bot') return pvpState.currentTurn === 'p1';
+      if (pvpState.mode === 'online') {
+        if (pvpState.role === 'host' && pvpState.currentTurn === 'p1') return true;
+        if (pvpState.role === 'guest' && pvpState.currentTurn === 'p2') return true;
+        return false;
+      }
+      return false;
+    }
+
+    function onTileClick(tileIdx) {
+      if (!canActivePlayerPick()) {
+        showToast('⏳ Chưa tới lượt của bạn!');
+        return;
+      }
+      if (pvpState.tiles[tileIdx].status !== 'unopened') return;
+
+      if (pvpState.mode === 'online' && pvpState.conn && pvpState.conn.open) {
+        pvpState.conn.send({ type: 'SELECT_TILE', tileIdx });
+      }
+      handleTileSelected(tileIdx, true);
+    }
+
+    function handleTileSelected(tileIdx, isLocalOrigin) {
+      pvpState.activeTileIdx = tileIdx;
+      pvpState.isAnswering = true;
+      clearInterval(pvpState.timer);
+
+      // Highlight active tile on board
+      renderPvpTilesGrid();
+      const activeTileBtn = pvpEls.tilesGrid.querySelector(`[data-idx="${tileIdx}"]`);
+      if (activeTileBtn) activeTileBtn.classList.add('currently-active');
+
+      openBattleModal(tileIdx);
+    }
+
+    function updatePvpArenaHud() {
+      // P1 Info
+      pvpEls.p1Avatar.textContent = pvpState.p1.avatar;
+      pvpEls.p1Name.textContent = pvpState.p1.name;
+      pvpEls.p1Score.textContent = pvpState.p1.score;
+      pvpEls.p1CorrectCount.textContent = pvpState.p1.correct;
+      renderHearts(pvpEls.p1Lives, pvpState.p1.lives);
+
+      // P2 Info
+      pvpEls.p2Avatar.textContent = pvpState.p2.avatar;
+      pvpEls.p2Name.textContent = pvpState.p2.name;
+      pvpEls.p2Score.textContent = pvpState.p2.score;
+      pvpEls.p2CorrectCount.textContent = pvpState.p2.correct;
+      renderHearts(pvpEls.p2Lives, pvpState.p2.lives);
+
+      // Active Turn Banner
+      const isP1 = pvpState.currentTurn === 'p1';
+      pvpEls.hudP1.classList.toggle('active-turn', isP1);
+      pvpEls.hudP2.classList.toggle('active-turn', !isP1);
+
+      const activePlayer = isP1 ? pvpState.p1 : pvpState.p2;
+      const isMyTurn = canActivePlayerPick();
+
+      if (isMyTurn) {
+        pvpEls.turnBanner.className = 'pvp-turn-banner my-turn';
+        pvpEls.turnText.textContent = `🎯 LƯỢT CỦA BẠN (${activePlayer.name})`;
+        pvpEls.subturnNote.textContent = 'Chọn 1 trong 60 ô số bất kỳ bên dưới';
+      } else {
+        pvpEls.turnBanner.className = 'pvp-turn-banner opp-turn';
+        pvpEls.turnText.textContent = `⏳ LƯỢT CỦA ${activePlayer.name.toUpperCase()}`;
+        pvpEls.subturnNote.textContent = 'Đối thủ đang chọn ô số thi đấu...';
+      }
+    }
+
+    function renderHearts(container, count) {
+      container.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const span = document.createElement('span');
+        span.className = `heart ${i < count ? 'active' : ''}`;
+        span.textContent = '❤️';
+        container.appendChild(span);
+      }
+    }
+
+    function startTurnTimer() {
+      clearInterval(pvpState.timer);
+      pvpState.timeLeft = 25;
+      updateTimerDisplay();
+
+      pvpState.timer = setInterval(() => {
+        pvpState.timeLeft--;
+        updateTimerDisplay();
+
+        if (pvpState.timeLeft <= 0) {
+          clearInterval(pvpState.timer);
+          // If modal is open, count as timeout (wrong answer)
+          if (pvpState.isAnswering) {
+            handleAnswerSubmitted(-1, true);
+          } else {
+            // Player took too long to pick a tile -> pick random tile
+            autoPickTileForActivePlayer();
+          }
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const txt = `${pvpState.timeLeft}s`;
+      pvpEls.timerSec.textContent = txt;
+      pvpEls.battleTimer.textContent = txt;
+
+      const isDanger = pvpState.timeLeft <= 5;
+      pvpEls.timerSec.classList.toggle('danger', isDanger);
+      pvpEls.battleTimer.style.color = isDanger ? '#ef4444' : '#f59e0b';
+    }
+
+    function autoPickTileForActivePlayer() {
+      const unopened = pvpState.tiles.filter(t => t.status === 'unopened');
+      if (unopened.length > 0) {
+        const randTile = unopened[Math.floor(Math.random() * unopened.length)];
+        onTileClick(randTile.idx);
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Question Battle Modal Execution
+    // ------------------------------------------------------------------------
+    function openBattleModal(tileIdx) {
+      const q = pvpState.questions[tileIdx];
+      if (!q) return;
+
+      const isP1 = pvpState.currentTurn === 'p1';
+      const activePlayer = isP1 ? pvpState.p1 : pvpState.p2;
+      const isMyTurn = canActivePlayerPick();
+
+      pvpEls.battleBadge.textContent = `Ô SỐ #${tileIdx + 1} • ${q.chapter.split(':')[0] || 'MLN111'}`;
+      pvpEls.battlePickerAvatar.textContent = activePlayer.avatar;
+      pvpEls.battlePickerMsg.textContent = isMyTurn 
+        ? `Lượt của bạn! Hãy chọn đáp án chính xác:` 
+        : `${activePlayer.name} đang suy nghĩ và chọn đáp án...`;
+
+      pvpEls.battleQText.textContent = q.question;
+      pvpEls.battleResultBanner.classList.add('hide');
+      pvpEls.battleOptionsGrid.innerHTML = '';
+
+      const letters = ['A', 'B', 'C', 'D'];
+      q.options.forEach((optText, optIdx) => {
+        const btn = document.createElement('button');
+        btn.className = 'battle-opt-btn';
+        btn.innerHTML = `<span class="opt-key">${letters[optIdx]}</span><span>${escapeHtml(optText)}</span>`;
+
+        if (isMyTurn) {
+          btn.addEventListener('click', () => {
+            if (pvpState.mode === 'online' && pvpState.conn && pvpState.conn.open) {
+              pvpState.conn.send({ type: 'SUBMIT_ANSWER', optIdx });
+            }
+            handleAnswerSubmitted(optIdx, true);
+          });
+        } else {
+          btn.disabled = true;
+        }
+
+        pvpEls.battleOptionsGrid.appendChild(btn);
+      });
+
+      pvpEls.battleModal.classList.remove('hide');
+      startTurnTimer(); // 25s for answering
+    }
+
+    function handleAnswerSubmitted(optIdx, isLocalOrigin) {
+      clearInterval(pvpState.timer);
+      const q = pvpState.questions[pvpState.activeTileIdx];
+      const isP1 = pvpState.currentTurn === 'p1';
+      const activePlayer = isP1 ? pvpState.p1 : pvpState.p2;
+      const isCorrect = optIdx === q.correctIdx;
+
+      // Disable all option buttons
+      const buttons = pvpEls.battleOptionsGrid.querySelectorAll('.battle-opt-btn');
+      buttons.forEach(b => b.disabled = true);
+
+      // Colorize options
+      if (optIdx >= 0 && buttons[optIdx]) {
+        buttons[optIdx].classList.add(isCorrect ? 'correct' : 'wrong');
+      }
+      if (!isCorrect && buttons[q.correctIdx]) {
+        buttons[q.correctIdx].classList.add('correct');
+      }
+
+      // Result Feedback Banner
+      pvpEls.battleResultBanner.classList.remove('hide', 'wrong-banner');
+      if (isCorrect) {
+        pvpEls.battleResultIcon.textContent = '✅';
+        pvpEls.battleResultTitle.textContent = `Chính xác! +100 Điểm cho ${activePlayer.name}`;
+        pvpEls.battleResultDesc.textContent = `Đáp án đúng: ${q.answer}`;
+
+        activePlayer.score += 100;
+        activePlayer.correct += 1;
+        pvpState.tiles[pvpState.activeTileIdx].status = isP1 ? 'claimed-p1' : 'claimed-p2';
+        pvpState.tiles[pvpState.activeTileIdx].claimedBy = isP1 ? 'p1' : 'p2';
+
+        playCorrectSound();
+        triggerConfetti();
+      } else {
+        pvpEls.battleResultBanner.classList.add('wrong-banner');
+        pvpEls.battleResultIcon.textContent = '❌';
+        pvpEls.battleResultTitle.textContent = optIdx === -1 
+          ? `Hết giờ! ${activePlayer.name} bị trừ 1 mạng ❤️` 
+          : `Sai rồi! ${activePlayer.name} bị trừ 1 mạng ❤️`;
+        pvpEls.battleResultDesc.textContent = `Đáp án chính xác là: ${q.answer}`;
+
+        activePlayer.lives -= 1;
+        pvpState.tiles[pvpState.activeTileIdx].status = 'claimed-wrong';
+        pvpState.wrongQuestions.push(q);
+
+        playWrongSound();
+        playHeartLossSound();
+      }
+
+      updatePvpArenaHud();
+      renderPvpTilesGrid();
+
+      // Close modal after delay and check for game termination
+      setTimeout(() => {
+        pvpEls.battleModal.classList.add('hide');
+        pvpState.isAnswering = false;
+
+        checkPvpGameOver();
+      }, 2300);
+    }
+
+    function checkPvpGameOver() {
+      // 1. Check K.O. by lives depletion
+      if (pvpState.p1.lives <= 0) {
+        triggerPvpGameOver('p2', `${pvpState.p1.name} đã mất hết 3 mạng! K.O.!`);
+        return;
+      }
+      if (pvpState.p2.lives <= 0) {
+        triggerPvpGameOver('p1', `${pvpState.p2.name} đã mất hết 3 mạng! K.O.!`);
+        return;
+      }
+
+      // 2. Check all 60 tiles opened
+      const remaining = pvpState.tiles.filter(t => t.status === 'unopened');
+      if (remaining.length === 0) {
+        if (pvpState.p1.score > pvpState.p2.score) {
+          triggerPvpGameOver('p1', 'Đã mở hết 60 ô! P1 thắng nhờ điểm số cao hơn!');
+        } else if (pvpState.p2.score > pvpState.p1.score) {
+          triggerPvpGameOver('p2', 'Đã mở hết 60 ô! P2 thắng nhờ điểm số cao hơn!');
+        } else {
+          triggerPvpGameOver('draw', 'Trận đấu hòa sau 60 ô số căng thẳng!');
+        }
+        return;
+      }
+
+      // 3. Switch turn
+      pvpState.currentTurn = pvpState.currentTurn === 'p1' ? 'p2' : 'p1';
+      renderPvpTilesGrid();
+      updatePvpArenaHud();
+      startTurnTimer();
+
+      // If Bot mode and it's Bot's turn -> run Bot move
+      if (pvpState.mode === 'bot' && pvpState.currentTurn === 'p2') {
+        runBotTurn();
+      }
+    }
+
+    function runBotTurn() {
+      const unopened = pvpState.tiles.filter(t => t.status === 'unopened');
+      if (unopened.length === 0) return;
+
+      // 1. Simulate Bot deliberation before picking a tile (1.5 - 2.5s)
+      setTimeout(() => {
+        if (pvpState.currentTurn !== 'p2' || pvpState.isAnswering) return;
+        const chosenTile = unopened[Math.floor(Math.random() * unopened.length)];
+        handleTileSelected(chosenTile.idx, false);
+
+        // 2. Simulate Bot answering question (2 - 3.5s)
+        setTimeout(() => {
+          if (!pvpState.isAnswering) return;
+          const q = pvpState.questions[chosenTile.idx];
+          const accuracy = pvpState.botDiff === 'easy' ? 0.55 : (pvpState.botDiff === 'medium' ? 0.75 : 0.92);
+
+          let chosenOpt = q.correctIdx;
+          if (Math.random() > accuracy) {
+            // Pick a wrong option
+            const wrongOptions = [0, 1, 2, 3].filter(i => i !== q.correctIdx);
+            chosenOpt = wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+          }
+
+          handleAnswerSubmitted(chosenOpt, false);
+        }, 2200 + Math.random() * 1200);
+
+      }, 1600 + Math.random() * 1000);
+    }
+
+    function triggerPvpGameOver(winner, reason) {
+      clearInterval(pvpState.timer);
+      pvpEls.gameOverModal.classList.remove('hide');
+
+      const isP1Win = winner === 'p1';
+      const isP2Win = winner === 'p2';
+      const isDraw = winner === 'draw';
+
+      if (isDraw) {
+        pvpEls.winnerTitle.textContent = 'HÒA NHAU!';
+      } else {
+        const winPlayer = isP1Win ? pvpState.p1 : pvpState.p2;
+        pvpEls.winnerTitle.textContent = `🏆 ${winPlayer.name.toUpperCase()} THẮNG!`;
+      }
+      pvpEls.winnerReason.textContent = reason;
+
+      // Populate Cards
+      pvpEls.finalP1Avatar.textContent = pvpState.p1.avatar;
+      pvpEls.finalP1Name.textContent = pvpState.p1.name;
+      pvpEls.finalP1Score.textContent = `${pvpState.p1.score} điểm`;
+      pvpEls.finalP1Stats.textContent = `Chiếm: ${pvpState.p1.correct} ô • Còn ❤️: ${pvpState.p1.lives}`;
+      pvpEls.cardP1Final.classList.toggle('winner-card', isP1Win);
+
+      pvpEls.finalP2Avatar.textContent = pvpState.p2.avatar;
+      pvpEls.finalP2Name.textContent = pvpState.p2.name;
+      pvpEls.finalP2Score.textContent = `${pvpState.p2.score} điểm`;
+      pvpEls.finalP2Stats.textContent = `Chiếm: ${pvpState.p2.correct} ô • Còn ❤️: ${pvpState.p2.lives}`;
+      pvpEls.cardP2Final.classList.toggle('winner-card', isP2Win);
+
+      // Wrong review list
+      if (pvpState.wrongQuestions.length > 0) {
+        pvpEls.wrongReviewSection.classList.remove('hide');
+        pvpEls.wrongList.innerHTML = pvpState.wrongQuestions.map((q, idx) => `
+          <div class="wrong-item">
+            <div class="q-line">${idx + 1}. ${escapeHtml(q.question)}</div>
+            <div class="a-line">👉 Đáp án chính xác: <strong>${escapeHtml(q.answer)}</strong></div>
+          </div>
+        `).join('');
+      } else {
+        pvpEls.wrongReviewSection.classList.add('hide');
+      }
+
+      playVictorySound();
+      triggerConfetti();
+    }
+
+    pvpEls.btnRematch.addEventListener('click', () => {
+      if (pvpState.mode === 'online' && pvpState.conn && pvpState.conn.open) {
+        pvpState.conn.send({ type: 'REMATCH' });
+      }
+      startPvpArena();
+      playClickSound();
+    });
+
+    pvpEls.btnLeave.addEventListener('click', () => {
+      pvpEls.gameOverModal.classList.add('hide');
+      resetPvpToLobby();
+      playClickSound();
+    });
+
+    // ------------------------------------------------------------------------
+    // GAME 2: LEO THÁP TRIẾT GIA (BOSS BATTLE SURVIVAL)
+    // ------------------------------------------------------------------------
+    const bossConfig = [
+      { name: 'Boss Tầng 1: Thần Học Trung Cổ', sprite: '👹', maxHp: 300, floor: 1 },
+      { name: 'Boss Tầng 2: Chủ Nghĩa Duy Tâm', sprite: '🧙‍♂️', maxHp: 450, floor: 2 },
+      { name: 'Boss Tầng 3: Ngụy Biện & Siêu Hình', sprite: '🐉', maxHp: 650, floor: 3 }
+    ];
+
+    const bossState = {
+      floorIdx: 0,
+      curHp: 300,
+      maxHp: 300,
+      hearts: 3,
+      combo: 0,
+      score: 0,
+      currentQuestion: null,
+      questionNum: 1
+    };
+
+    const bossEls = {
+      floorBadge: document.getElementById('boss-floor-badge'),
+      sprite: document.getElementById('boss-sprite'),
+      hitSlash: document.getElementById('boss-hit-slash'),
+      name: document.getElementById('boss-name'),
+      hpFill: document.getElementById('boss-hp-fill'),
+      hpCur: document.getElementById('boss-hp-cur'),
+      hpMax: document.getElementById('boss-hp-max'),
+      playerHearts: document.getElementById('boss-player-hearts'),
+      comboVal: document.getElementById('boss-combo-val'),
+      scoreVal: document.getElementById('boss-score-val'),
+      qNum: document.getElementById('boss-q-num'),
+      qText: document.getElementById('boss-q-text'),
+      optionsGrid: document.getElementById('boss-options-grid'),
+      feedbackBox: document.getElementById('boss-feedback-box'),
+      feedbackText: document.getElementById('boss-feedback-text')
+    };
+
+    function startBossGame() {
+      bossState.floorIdx = 0;
+      bossState.hearts = 3;
+      bossState.combo = 0;
+      bossState.score = 0;
+      bossState.questionNum = 1;
+      loadBossFloor(0);
+    }
+
+    function loadBossFloor(floorIdx) {
+      bossState.floorIdx = floorIdx;
+      const b = bossConfig[floorIdx];
+      bossState.curHp = b.maxHp;
+      bossState.maxHp = b.maxHp;
+
+      bossEls.floorBadge.textContent = `Tầng ${b.floor} / 3`;
+      bossEls.name.textContent = b.name;
+      bossEls.sprite.textContent = b.sprite;
+      updateBossHpBar();
+      updateBossHud();
+      nextBossQuestion();
+    }
+
+    function updateBossHpBar() {
+      const pct = Math.max(0, (bossState.curHp / bossState.maxHp) * 100);
+      bossEls.hpFill.style.width = `${pct}%`;
+      bossEls.hpCur.textContent = Math.max(0, bossState.curHp);
+      bossEls.hpMax.textContent = bossState.maxHp;
+    }
+
+    function updateBossHud() {
+      renderHearts(bossEls.playerHearts, bossState.hearts);
+      bossEls.comboVal.textContent = bossState.combo;
+      bossEls.scoreVal.textContent = bossState.score;
+    }
+
+    function nextBossQuestion() {
+      bossEls.feedbackBox.classList.add('hide');
+      const questions = state.allQuestions;
+      const randQ = questions[Math.floor(Math.random() * questions.length)];
+
+      let opts = Array.isArray(randQ.options) ? [...randQ.options] : [];
+      if (opts.length < 4) {
+        const pool = questions.filter(o => o.id !== randQ.id && o.answer).map(o => o.answer);
+        while (opts.length < 4 && pool.length > 0) {
+          const r = Math.floor(Math.random() * pool.length);
+          opts.push(pool.splice(r, 1)[0]);
+        }
+      }
+      if (!opts.includes(randQ.answer)) {
+        if (opts.length >= 4) opts[3] = randQ.answer;
+        else opts.push(randQ.answer);
+      }
+      for (let i = opts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [opts[i], opts[j]] = [opts[j], opts[i]];
+      }
+
+      bossState.currentQuestion = {
+        question: randQ.question,
+        options: opts,
+        answer: randQ.answer,
+        correctIdx: opts.indexOf(randQ.answer)
+      };
+
+      bossEls.qNum.textContent = `Câu Tấn Công #${bossState.questionNum++}`;
+      bossEls.qText.textContent = randQ.question;
+      bossEls.optionsGrid.innerHTML = '';
+
+      const letters = ['A', 'B', 'C', 'D'];
+      opts.forEach((optText, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'battle-opt-btn';
+        btn.innerHTML = `<span class="opt-key">${letters[idx]}</span><span>${escapeHtml(optText)}</span>`;
+        btn.addEventListener('click', () => onBossAnswerChoice(idx));
+        bossEls.optionsGrid.appendChild(btn);
+      });
+    }
+
+    function onBossAnswerChoice(selectedIdx) {
+      const q = bossState.currentQuestion;
+      const buttons = bossEls.optionsGrid.querySelectorAll('.battle-opt-btn');
+      buttons.forEach(b => b.disabled = true);
+
+      const isCorrect = selectedIdx === q.correctIdx;
+      if (buttons[selectedIdx]) {
+        buttons[selectedIdx].classList.add(isCorrect ? 'correct' : 'wrong');
+      }
+      if (!isCorrect && buttons[q.correctIdx]) {
+        buttons[q.correctIdx].classList.add('correct');
+      }
+
+      if (isCorrect) {
+        bossState.combo++;
+        const baseDmg = 150;
+        const isCrit = bossState.combo >= 3;
+        const dmg = isCrit ? baseDmg + 100 : baseDmg;
+
+        bossState.curHp -= dmg;
+        bossState.score += isCrit ? 250 : 150;
+
+        // Visual slash and shake
+        bossEls.hitSlash.textContent = isCrit ? `💥 CHÍ MẠNG -${dmg}` : `⚔️ -${dmg}`;
+        bossEls.hitSlash.classList.remove('hide');
+        bossEls.sprite.classList.add('shake');
+        playSlashSound();
+        playCorrectSound();
+
+        setTimeout(() => {
+          bossEls.hitSlash.classList.add('hide');
+          bossEls.sprite.classList.remove('shake');
+        }, 600);
+
+        updateBossHpBar();
+        updateBossHud();
+
+        if (bossState.curHp <= 0) {
+          // Boss defeated!
+          setTimeout(() => {
+            if (bossState.floorIdx < bossConfig.length - 1) {
+              showToast(`🎉 Đã đánh bại ${bossConfig[bossState.floorIdx].name}! Thăng lên Tầng tiếp theo!`);
+              triggerConfetti();
+              loadBossFloor(bossState.floorIdx + 1);
+            } else {
+              showToast('🏆 XUẤT SẮC! Bạn đã phá đảo toàn bộ 3 tầng Tháp Triết Gia!');
+              playVictorySound();
+              triggerConfetti();
+              setTimeout(returnToGamesHub, 3000);
+            }
+          }, 800);
+          return;
+        }
+      } else {
+        bossState.combo = 0;
+        bossState.hearts -= 1;
+        playWrongSound();
+        playHeartLossSound();
+        updateBossHud();
+
+        if (bossState.hearts <= 0) {
+          setTimeout(() => {
+            showToast('💀 Bạn đã bị Boss đánh bại! Hãy thử lại để phục thù.');
+            setTimeout(returnToGamesHub, 2500);
+          }, 800);
+          return;
+        }
+      }
+
+      setTimeout(nextBossQuestion, 1600);
+    }
+
+    // ------------------------------------------------------------------------
+    // GAME 3: ĐUA TỐC ĐỘ 60S BLITZ (RAPID-FIRE SPEED RUN)
+    // ------------------------------------------------------------------------
+    const speedState = {
+      highScore: parseInt(localStorage.getItem('mln_speed_highscore') || '0', 10),
+      currentScore: 0,
+      timeLeft: 60.0,
+      timer: null,
+      combo: 0,
+      correctCount: 0,
+      totalCount: 0,
+      currentQuestion: null
+    };
+
+    const speedEls = {
+      highScoreBadge: document.getElementById('speed-high-score'),
+      startView: document.getElementById('speed-start-view'),
+      activeView: document.getElementById('speed-active-view'),
+      resultView: document.getElementById('speed-result-view'),
+      btnStart: document.getElementById('btn-speed-start'),
+      btnRetry: document.getElementById('btn-speed-retry'),
+      timerNum: document.getElementById('speed-timer-number'),
+      feverBadge: document.getElementById('speed-fever-badge'),
+      curScore: document.getElementById('speed-current-score'),
+      qMeta: document.getElementById('speed-q-meta'),
+      qText: document.getElementById('speed-q-text'),
+      optionsGrid: document.getElementById('speed-options-grid'),
+      finalScore: document.getElementById('final-speed-score'),
+      finalSummary: document.getElementById('final-speed-summary')
+    };
+
+    function resetSpeedGame() {
+      clearInterval(speedState.timer);
+      speedEls.highScoreBadge.textContent = speedState.highScore;
+      speedEls.startView.classList.remove('hide');
+      speedEls.activeView.classList.add('hide');
+      speedEls.resultView.classList.add('hide');
+    }
+
+    speedEls.btnStart.addEventListener('click', startSpeedRun);
+    speedEls.btnRetry.addEventListener('click', startSpeedRun);
+
+    function startSpeedRun() {
+      speedState.currentScore = 0;
+      speedState.timeLeft = 60.0;
+      speedState.combo = 0;
+      speedState.correctCount = 0;
+      speedState.totalCount = 0;
+
+      speedEls.startView.classList.add('hide');
+      speedEls.resultView.classList.add('hide');
+      speedEls.activeView.classList.remove('hide');
+
+      updateSpeedHud();
+      nextSpeedQuestion();
+
+      clearInterval(speedState.timer);
+      const startTime = Date.now();
+      let lastTick = startTime;
+
+      speedState.timer = setInterval(() => {
+        const now = Date.now();
+        const delta = (now - lastTick) / 1000;
+        lastTick = now;
+
+        speedState.timeLeft -= delta;
+        if (speedState.timeLeft <= 0) {
+          speedState.timeLeft = 0;
+          endSpeedRun();
+        }
+        updateSpeedHud();
+      }, 100);
+    }
+
+    function updateSpeedHud() {
+      speedEls.timerNum.textContent = `${Math.max(0, speedState.timeLeft).toFixed(1)}s`;
+      speedEls.curScore.textContent = speedState.currentScore;
+
+      const mult = speedState.combo >= 6 ? 3 : (speedState.combo >= 3 ? 2 : 1);
+      speedEls.feverBadge.querySelector('.fever-text').textContent = mult > 1 ? `🔥 FEVER x${mult}` : 'FEVER x1';
+      speedEls.feverBadge.style.background = mult > 1 ? 'linear-gradient(135deg, #f43f5e, #f59e0b)' : 'rgba(245, 158, 11, 0.2)';
+    }
+
+    function nextSpeedQuestion() {
+      const questions = state.allQuestions;
+      const q = questions[Math.floor(Math.random() * questions.length)];
+
+      let opts = Array.isArray(q.options) ? [...q.options] : [];
+      if (opts.length < 4) {
+        const pool = questions.filter(o => o.id !== q.id && o.answer).map(o => o.answer);
+        while (opts.length < 4 && pool.length > 0) {
+          opts.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        }
+      }
+      if (!opts.includes(q.answer)) {
+        if (opts.length >= 4) opts[3] = q.answer;
+        else opts.push(q.answer);
+      }
+      for (let i = opts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [opts[i], opts[j]] = [opts[j], opts[i]];
+      }
+
+      speedState.currentQuestion = {
+        question: q.question,
+        options: opts,
+        answer: q.answer,
+        correctIdx: opts.indexOf(q.answer)
+      };
+
+      speedState.totalCount++;
+      speedEls.qMeta.textContent = `Câu #${speedState.totalCount}`;
+      speedEls.qText.textContent = q.question;
+      speedEls.optionsGrid.innerHTML = '';
+
+      opts.forEach((optText, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'battle-opt-btn';
+        btn.innerHTML = `<span class="opt-key">${['A', 'B', 'C', 'D'][idx]}</span><span>${escapeHtml(optText)}</span>`;
+        btn.addEventListener('click', () => onSpeedOptionClick(idx));
+        speedEls.optionsGrid.appendChild(btn);
+      });
+    }
+
+    function onSpeedOptionClick(idx) {
+      const q = speedState.currentQuestion;
+      const isCorrect = idx === q.correctIdx;
+
+      if (isCorrect) {
+        speedState.correctCount++;
+        speedState.combo++;
+        const mult = speedState.combo >= 6 ? 3 : (speedState.combo >= 3 ? 2 : 1);
+        speedState.currentScore += 100 * mult;
+        speedState.timeLeft += 5.0; // Bonus time
+        playCorrectSound();
+      } else {
+        speedState.combo = 0;
+        speedState.timeLeft = Math.max(0, speedState.timeLeft - 3.0); // Penalty time
+        playWrongSound();
+      }
+
+      updateSpeedHud();
+      if (speedState.timeLeft > 0) {
+        nextSpeedQuestion();
+      }
+    }
+
+    function endSpeedRun() {
+      clearInterval(speedState.timer);
+      speedEls.activeView.classList.add('hide');
+      speedEls.resultView.classList.remove('hide');
+
+      speedEls.finalScore.textContent = `${speedState.currentScore} Điểm`;
+      speedEls.finalSummary.textContent = `Bạn đã trả lời đúng ${speedState.correctCount}/${speedState.totalCount} câu trong 60 giây.`;
+
+      if (speedState.currentScore > speedState.highScore) {
+        speedState.highScore = speedState.currentScore;
+        localStorage.setItem('mln_speed_highscore', speedState.highScore);
+        speedEls.highScoreBadge.textContent = speedState.highScore;
+        showToast('🎉 KỶ LỤC MỚI ĐƯỢC XÁC LẬP! 🔥');
+        triggerConfetti();
+        playVictorySound();
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // GAME 4: LẬT THẺ GHÉP CẶP (MEMORY MATCH)
+    // ------------------------------------------------------------------------
+    const corePairs = [
+      { id: 1, term: 'Ph. Ăngghen', text: 'Triết học nghiên cứu những quy luật chung nhất của tự nhiên, xã hội và tư duy' },
+      { id: 2, term: 'V.I. Lênin', text: 'Vật chất là thực tại khách quan đem lại cho con người trong cảm giác' },
+      { id: 3, term: 'C. Mác', text: 'Các nhà triết học chỉ giải thích thế giới, vấn đề là cải tạo thế giới' },
+      { id: 4, term: 'Biện chứng khách quan', text: 'Là biện chứng của bản thân thế giới vật chất độc lập với ý thức' },
+      { id: 5, term: 'Quy luật Lượng - Chất', text: 'Chỉ ra cách thức vận động, phát triển từ biến đổi dần dần đến nhảy vọt' },
+      { id: 6, term: 'Quy luật Mâu thuẫn', text: 'Chỉ ra nguồn gốc, động lực bên trong của mọi sự vận động và phát triển' },
+      { id: 7, term: 'Tồn tại xã hội', text: 'Đời sống vật chất và những điều kiện sinh hoạt vật chất của xã hội' },
+      { id: 8, term: 'Thực tiễn', text: 'Hoạt động vật chất có mục đích, mang tính lịch sử - xã hội của con người' }
+    ];
+
+    const memoryState = {
+      cards: [],
+      flippedCards: [],
+      matchedPairs: 0,
+      turns: 0,
+      timer: null,
+      seconds: 0
+    };
+
+    const memoryEls = {
+      grid: document.getElementById('memory-cards-grid'),
+      pairsFound: document.getElementById('memory-pairs-found'),
+      turnsCount: document.getElementById('memory-turns-count'),
+      timerText: document.getElementById('memory-timer-text'),
+      btnRestart: document.getElementById('btn-memory-restart'),
+      victoryModal: document.getElementById('memory-victory-modal'),
+      victoryStats: document.getElementById('memory-victory-stats'),
+      btnPlayAgain: document.getElementById('btn-memory-play-again')
+    };
+
+    memoryEls.btnRestart.addEventListener('click', initMemoryGame);
+    memoryEls.btnPlayAgain.addEventListener('click', () => {
+      memoryEls.victoryModal.classList.add('hide');
+      initMemoryGame();
+    });
+
+    function initMemoryGame() {
+      clearInterval(memoryState.timer);
+      memoryState.flippedCards = [];
+      memoryState.matchedPairs = 0;
+      memoryState.turns = 0;
+      memoryState.seconds = 0;
+
+      memoryEls.pairsFound.textContent = '0 / 8';
+      memoryEls.turnsCount.textContent = '0';
+      memoryEls.timerText.textContent = '00:00';
+      memoryEls.victoryModal.classList.add('hide');
+
+      // Create 16 cards (8 pairs: 1 card is Term, 1 card is Definition)
+      let cardItems = [];
+      corePairs.forEach(p => {
+        cardItems.push({ pairId: p.id, type: 'term', text: p.term });
+        cardItems.push({ pairId: p.id, type: 'desc', text: p.text });
+      });
+
+      // Shuffle 16 cards
+      for (let i = cardItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cardItems[i], cardItems[j]] = [cardItems[j], cardItems[i]];
+      }
+
+      memoryState.cards = cardItems;
+      renderMemoryGrid();
+
+      // Start timer
+      memoryState.timer = setInterval(() => {
+        memoryState.seconds++;
+        const mins = String(Math.floor(memoryState.seconds / 60)).padStart(2, '0');
+        const secs = String(memoryState.seconds % 60).padStart(2, '0');
+        memoryEls.timerText.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function renderMemoryGrid() {
+      memoryEls.grid.innerHTML = '';
+      memoryState.cards.forEach((card, idx) => {
+        const el = document.createElement('div');
+        el.className = 'memory-card';
+        el.setAttribute('data-idx', idx);
+
+        el.innerHTML = `
+          <div class="memory-card-inner">
+            <div class="memory-card-front">?</div>
+            <div class="memory-card-back">${escapeHtml(card.text)}</div>
+          </div>
+        `;
+
+        el.addEventListener('click', () => onMemoryCardClick(idx, el));
+        memoryEls.grid.appendChild(el);
+      });
+    }
+
+    function onMemoryCardClick(idx, cardEl) {
+      if (cardEl.classList.contains('flipped') || cardEl.classList.contains('matched')) return;
+      if (memoryState.flippedCards.length >= 2) return;
+
+      cardEl.classList.add('flipped');
+      playTone(400, 'triangle', 0.08, 0.08);
+      memoryState.flippedCards.push({ idx, el: cardEl, data: memoryState.cards[idx] });
+
+      if (memoryState.flippedCards.length === 2) {
+        memoryState.turns++;
+        memoryEls.turnsCount.textContent = memoryState.turns;
+
+        const [c1, c2] = memoryState.flippedCards;
+        if (c1.data.pairId === c2.data.pairId) {
+          // MATCH!
+          setTimeout(() => {
+            c1.el.classList.add('matched');
+            c2.el.classList.add('matched');
+            memoryState.matchedPairs++;
+            memoryEls.pairsFound.textContent = `${memoryState.matchedPairs} / 8`;
+            playCorrectSound();
+            memoryState.flippedCards = [];
+
+            if (memoryState.matchedPairs === 8) {
+              clearInterval(memoryState.timer);
+              triggerConfetti();
+              playVictorySound();
+              memoryEls.victoryStats.textContent = `Bạn đã ghép thành công 8 cặp khái niệm trong ${memoryState.turns} lượt lật và ${memoryState.seconds} giây.`;
+              memoryEls.victoryModal.classList.remove('hide');
+            }
+          }, 400);
+        } else {
+          // NO MATCH
+          setTimeout(() => {
+            c1.el.classList.remove('flipped');
+            c2.el.classList.remove('flipped');
+            memoryState.flippedCards = [];
+            playTone(220, 'sine', 0.1, 0.05);
+          }, 900);
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Check URL parameters for Auto-Join PvP Room
+    // ------------------------------------------------------------------------
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+      setTimeout(() => {
+        switchMode('games');
+        openGameScreen(pvpScreen);
+        switchPvpLobbyTab('online');
+        pvpEls.inputJoinRoomCode.value = roomParam.trim().toUpperCase();
+        showToast(`Đã nhận mã phòng: ${roomParam.toUpperCase()}. Bấm "Tham Gia Phòng" để PK!`);
+      }, 500);
+    }
+  }
+
+  // 15. SECURITY / ANTI-INSPECT PROTECTION
   function setupSecurityProtection() {
     // 1. Disable Right-Click Context Menu
     document.addEventListener('contextmenu', (e) => {
@@ -6309,7 +7843,7 @@
     }, true);
   }
 
-  // 15. INITIALIZE
+  // 16. INITIALIZE
   function init() {
     initTheme();
     initSound();
@@ -6318,6 +7852,7 @@
     applyFilterAndSearch();
     setupEventListeners();
     setupSecurityProtection();
+    initGamesModule();
   }
 
   // Run on DOM ready
